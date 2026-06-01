@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { COLOR_MAP, colorOf } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Users, Plus, ArrowRight, Loader2 } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import type { Group } from "@shared/schema";
 
 type GroupWithCount = Group & { memberCount: number };
@@ -21,6 +22,7 @@ type GroupWithCount = Group & { memberCount: number };
 export default function Groups() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useT();
   const { data: groups, isLoading } = useQuery<GroupWithCount[]>({ queryKey: ["/api/groups"] });
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -36,36 +38,36 @@ export default function Groups() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       setOpen(false); setName(""); setDescription(""); setColor("violet");
-      toast({ title: "Group created!" });
+      toast({ title: t("groups.created") });
     },
-    onError: (e: any) => toast({ title: "Couldn't create group", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("groups.cantCreate"), description: e.message, variant: "destructive" }),
   });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Groups</h1>
-          <p className="text-sm text-muted-foreground">{isTeacher ? "Organize students into classes." : "Classes you belong to."}</p>
+          <h1 className="text-3xl font-black tracking-tight">{t("groups.title")}</h1>
+          <p className="text-sm text-muted-foreground">{isTeacher ? t("groups.teacherSub") : t("groups.studentSub")}</p>
         </div>
         {isTeacher && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 font-bold" data-testid="button-create-group"><Plus className="h-4 w-4" /> New group</Button>
+              <Button className="gap-2 font-bold" data-testid="button-create-group"><Plus className="h-4 w-4" /> {t("groups.newGroup")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Create a group</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{t("groups.createGroup")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="font-bold">Group name</Label>
+                  <Label className="font-bold">{t("groups.name")}</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Algebra 101" data-testid="input-group-name" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="font-bold">Description</Label>
+                  <Label className="font-bold">{t("groups.description")}</Label>
                   <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Morning section, Fall term" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="font-bold">Color</Label>
+                  <Label className="font-bold">{t("groups.color")}</Label>
                   <div className="flex gap-2">
                     {Object.keys(COLOR_MAP).map((k) => (
                       <button key={k} type="button" onClick={() => setColor(k)} data-testid={`color-${k}`}
@@ -76,7 +78,7 @@ export default function Groups() {
               </div>
               <DialogFooter>
                 <Button onClick={() => create.mutate()} disabled={!name || create.isPending} className="font-bold" data-testid="button-save-group">
-                  {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create group
+                  {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("groups.createGroup")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -103,7 +105,7 @@ export default function Groups() {
                   </div>
                   <h3 className="mt-4 text-lg font-black">{g.name}</h3>
                   {g.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{g.description}</p>}
-                  <p className="mt-3 text-xs font-bold text-muted-foreground">{g.memberCount} {g.memberCount === 1 ? "student" : "students"}</p>
+                  <p className="mt-3 text-xs font-bold text-muted-foreground">{g.memberCount} {g.memberCount === 1 ? t("groups.student") : t("groups.students")}</p>
                 </Card>
               </Link>
             );
@@ -112,8 +114,8 @@ export default function Groups() {
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Users className="h-7 w-7" /></span>
-          <p className="mt-4 font-bold">{isTeacher ? "No groups yet" : "You're not in any group yet"}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? "Create your first group to start adding students." : "Ask your teacher to add you to a class."}</p>
+          <p className="mt-4 font-bold">{isTeacher ? t("groups.noneTeacher") : t("groups.noneStudent")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? t("groups.noneTeacherSub") : t("groups.noneStudentSub")}</p>
         </Card>
       )}
     </div>

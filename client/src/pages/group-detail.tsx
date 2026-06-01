@@ -15,6 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, UserPlus, Trash2, Loader2, Users } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import type { Group } from "@shared/schema";
 
 type Member = { id: number; fullName: string; email: string; username: string; avatarColor: string };
@@ -23,6 +24,7 @@ type GroupWithCount = Group & { memberCount: number };
 export default function GroupDetail({ id }: { id: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useT();
   const [, navigate] = useLocation();
   const isTeacher = user?.role === "teacher";
   const [identifier, setIdentifier] = useState("");
@@ -37,9 +39,9 @@ export default function GroupDetail({ id }: { id: number }) {
       queryClient.invalidateQueries({ queryKey: ["/api/groups", id, "members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       setIdentifier("");
-      toast({ title: "Student added!", description: m.fullName });
+      toast({ title: t("gd.studentAdded"), description: m.fullName });
     },
-    onError: (e: any) => toast({ title: "Couldn't add student", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("gd.cantAdd"), description: e.message, variant: "destructive" }),
   });
 
   const removeMember = useMutation({
@@ -55,7 +57,7 @@ export default function GroupDetail({ id }: { id: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       navigate("/groups");
-      toast({ title: "Group deleted" });
+      toast({ title: t("gd.groupDeleted") });
     },
   });
 
@@ -64,7 +66,7 @@ export default function GroupDetail({ id }: { id: number }) {
   return (
     <div className="space-y-6">
       <Link href="/groups" className="inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Back to groups
+        <ArrowLeft className="h-4 w-4" /> {t("gd.back")}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -73,23 +75,23 @@ export default function GroupDetail({ id }: { id: number }) {
             <Users className="h-7 w-7" />
           </span>
           <div>
-            <h1 className="text-3xl font-black tracking-tight">{group?.name ?? "Group"}</h1>
+            <h1 className="text-3xl font-black tracking-tight">{group?.name ?? t("groups.title")}</h1>
             {group?.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
           </div>
         </div>
         {isTeacher && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="gap-2 font-bold text-destructive" data-testid="button-delete-group"><Trash2 className="h-4 w-4" /> Delete</Button>
+              <Button variant="outline" className="gap-2 font-bold text-destructive" data-testid="button-delete-group"><Trash2 className="h-4 w-4" /> {t("common.delete")}</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this group?</AlertDialogTitle>
-                <AlertDialogDescription>This removes the group and its memberships. Quizzes and results stay intact.</AlertDialogDescription>
+                <AlertDialogTitle>{t("gd.deleteGroup")}</AlertDialogTitle>
+                <AlertDialogDescription>{t("gd.deleteGroupDesc")}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => deleteGroup.mutate()} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteGroup.mutate()} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -98,22 +100,22 @@ export default function GroupDetail({ id }: { id: number }) {
 
       {isTeacher && (
         <Card className="p-5">
-          <p className="font-black">Add a student</p>
-          <p className="mb-3 text-sm text-muted-foreground">Enter the student's Gmail or username. They must already have a math.az account.</p>
+          <p className="font-black">{t("gd.addStudent")}</p>
+          <p className="mb-3 text-sm text-muted-foreground">{t("gd.addStudentSub")}</p>
           <form
             onSubmit={(e) => { e.preventDefault(); if (identifier) addMember.mutate(); }}
             className="flex flex-col gap-2 sm:flex-row"
           >
-            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="student@gmail.com or username" data-testid="input-add-student" />
+            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder={t("gd.addStudentPlaceholder")} data-testid="input-add-student" />
             <Button type="submit" disabled={!identifier || addMember.isPending} className="gap-2 font-bold" data-testid="button-add-student">
-              {addMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Add
+              {addMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} {t("common.add")}
             </Button>
           </form>
         </Card>
       )}
 
       <div>
-        <h2 className="mb-3 text-lg font-black">Students {members && `(${members.length})`}</h2>
+        <h2 className="mb-3 text-lg font-black">{t("gd.studentsHeading")} {members && `(${members.length})`}</h2>
         {isLoading ? (
           <Skeleton className="h-40 rounded-2xl" />
         ) : members && members.length > 0 ? (
@@ -139,7 +141,7 @@ export default function GroupDetail({ id }: { id: number }) {
             })}
           </div>
         ) : (
-          <Card className="flex items-center justify-center border-dashed p-10 text-sm text-muted-foreground">No students in this group yet.</Card>
+          <Card className="flex items-center justify-center border-dashed p-10 text-sm text-muted-foreground">{t("gd.noStudents")}</Card>
         )}
       </div>
     </div>

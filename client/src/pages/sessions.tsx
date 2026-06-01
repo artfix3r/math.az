@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Video, Plus, CalendarClock, Clock, Trash2, Loader2, ExternalLink } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import type { ClassSession, Group } from "@shared/schema";
 
 function fmt(ts: number) {
@@ -30,12 +31,13 @@ function status(s: ClassSession): "live" | "upcoming" | "ended" {
 export default function Sessions() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useT();
   const isTeacher = user?.role === "teacher";
   const { data: sessions, isLoading } = useQuery<ClassSession[]>({ queryKey: ["/api/sessions"] });
 
   const del = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/sessions/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sessions"] }); toast({ title: "Session removed" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/sessions"] }); toast({ title: t("sess.removed") }); },
   });
 
   const sorted = [...(sessions ?? [])].sort((a, b) => a.startAt - b.startAt);
@@ -44,8 +46,8 @@ export default function Sessions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Live sessions</h1>
-          <p className="text-sm text-muted-foreground">{isTeacher ? "Schedule online classes with a meeting link." : "Join your scheduled online classes."}</p>
+          <h1 className="text-3xl font-black tracking-tight">{t("sess.title")}</h1>
+          <p className="text-sm text-muted-foreground">{isTeacher ? t("sess.teacherSub") : t("sess.studentSub")}</p>
         </div>
         {isTeacher && <NewSessionDialog />}
       </div>
@@ -63,18 +65,18 @@ export default function Sessions() {
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300"><Video className="h-5 w-5" /></span>
                     <h3 className="text-lg font-black">{s.title}</h3>
                   </div>
-                  {st === "live" ? <Badge className="animate-pulse bg-green-500 text-white">Live now</Badge>
-                    : st === "upcoming" ? <Badge className="bg-blue-500 text-white">Upcoming</Badge>
-                    : <Badge className="bg-muted text-muted-foreground">Ended</Badge>}
+                  {st === "live" ? <Badge className="animate-pulse bg-green-500 text-white">{t("sess.live")}</Badge>
+                    : st === "upcoming" ? <Badge className="bg-blue-500 text-white">{t("sess.upcoming")}</Badge>
+                    : <Badge className="bg-muted text-muted-foreground">{t("sess.ended")}</Badge>}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
                   <span className="flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" /> {fmt(s.startAt)}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {s.durationMinutes} min</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {s.durationMinutes} {t("common.min")}</span>
                 </div>
                 <div className="mt-4 flex gap-2 border-t pt-4">
                   <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
                     <Button className="w-full gap-2 font-bold" disabled={st === "ended"} data-testid={`button-join-${s.id}`}>
-                      <ExternalLink className="h-4 w-4" /> {st === "ended" ? "Session ended" : "Join meeting"}
+                      <ExternalLink className="h-4 w-4" /> {st === "ended" ? t("sess.sessionEnded") : t("sess.join")}
                     </Button>
                   </a>
                   {isTeacher && (
@@ -90,8 +92,8 @@ export default function Sessions() {
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Video className="h-7 w-7" /></span>
-          <p className="mt-4 font-bold">No sessions scheduled</p>
-          <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? "Schedule a session and share the meeting link with a group." : "Your teacher's scheduled classes will appear here."}</p>
+          <p className="mt-4 font-bold">{t("sess.none")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? t("sess.noneTeacherSub") : t("sess.noneStudentSub")}</p>
         </Card>
       )}
     </div>
@@ -100,6 +102,7 @@ export default function Sessions() {
 
 function NewSessionDialog() {
   const { toast } = useToast();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
@@ -118,52 +121,52 @@ function NewSessionDialog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       setOpen(false); setTitle(""); setMeetingUrl(""); setStartAt(""); setGroupId("none");
-      toast({ title: "Session scheduled!" });
+      toast({ title: t("sess.scheduled") });
     },
-    onError: (e: any) => toast({ title: "Couldn't schedule", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("sess.cantSchedule"), description: e.message, variant: "destructive" }),
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 font-bold" data-testid="button-new-session"><Plus className="h-4 w-4" /> Schedule session</Button>
+        <Button className="gap-2 font-bold" data-testid="button-new-session"><Plus className="h-4 w-4" /> {t("sess.schedule")}</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Schedule a live session</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("sess.scheduleTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="font-bold">Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Live review — Geometry" data-testid="input-session-title" />
+            <Label className="font-bold">{t("sess.sessionTitle")}</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("sess.titlePlaceholder")} data-testid="input-session-title" />
           </div>
           <div className="space-y-1.5">
-            <Label className="font-bold">Meeting link</Label>
-            <Input value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="https://meet.google.com/… or Zoom/Jitsi link" data-testid="input-meeting-url" />
-            <p className="text-xs text-muted-foreground">Paste a Google Meet, Zoom, or Jitsi link. Students click "Join" to open it.</p>
+            <Label className="font-bold">{t("sess.meetingLink")}</Label>
+            <Input value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="https://meet.google.com/…" data-testid="input-meeting-url" />
+            <p className="text-xs text-muted-foreground">{t("sess.linkHint")}</p>
           </div>
           <div className="space-y-1.5">
-            <Label className="font-bold">Assign to group</Label>
+            <Label className="font-bold">{t("sess.assignGroup")}</Label>
             <Select value={groupId} onValueChange={setGroupId}>
-              <SelectTrigger><SelectValue placeholder="Choose group" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("qb.chooseGroup")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">All my students (no group)</SelectItem>
+                <SelectItem value="none">{t("sess.allStudents")}</SelectItem>
                 {groups?.map((g) => <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="font-bold">Starts at</Label>
+              <Label className="font-bold">{t("sess.startsAt")}</Label>
               <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} data-testid="input-session-start" />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-bold">Duration (min)</Label>
+              <Label className="font-bold">{t("sess.durationMin")}</Label>
               <Input type="number" min={1} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
             </div>
           </div>
         </div>
         <DialogFooter>
           <Button onClick={() => create.mutate()} disabled={!title || !meetingUrl || create.isPending} className="font-bold" data-testid="button-save-session">
-            {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Schedule
+            {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("sess.schedule")}
           </Button>
         </DialogFooter>
       </DialogContent>

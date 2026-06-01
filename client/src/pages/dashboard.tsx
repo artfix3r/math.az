@@ -6,20 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { colorOf } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { Users, FileQuestion, Video, Trophy, Plus, ArrowRight, CalendarClock } from "lucide-react";
 import type { Group, Quiz, ClassSession } from "@shared/schema";
 
 type GroupWithCount = Group & { memberCount: number };
 type StudentQuiz = Quiz & { submission: { score: number; maxScore: number; needsGrading: number } | null };
 
-function fmt(ts?: number | null) {
-  if (!ts) return "Anytime";
-  return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useT();
   const isTeacher = user?.role === "teacher";
+
+  const fmt = (ts?: number | null) => {
+    if (!ts) return t("quiz.anytime");
+    return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
 
   const { data: groups } = useQuery<GroupWithCount[]>({ queryKey: ["/api/groups"] });
   const { data: quizzes } = useQuery<(Quiz | StudentQuiz)[]>({ queryKey: ["/api/quizzes"] });
@@ -27,7 +29,7 @@ export default function Dashboard() {
 
   const greeting = (() => {
     const h = new Date().getHours();
-    return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    return h < 12 ? t("dash.morning") : h < 18 ? t("dash.afternoon") : t("dash.evening");
   })();
 
   return (
@@ -36,20 +38,18 @@ export default function Dashboard() {
         <p className="text-sm font-bold text-primary">{greeting} 👋</p>
         <h1 className="mt-1 text-3xl font-black tracking-tight">{user?.fullName}</h1>
         <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-          {isTeacher
-            ? "Build groups, launch quizzes, host live sessions, and watch your students grow."
-            : "Jump into your quizzes, join live classes, and keep an eye on your results."}
+          {isTeacher ? t("dash.teacherSub") : t("dash.studentSub")}
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           {isTeacher ? (
             <>
-              <Link href="/quizzes/new"><Button className="gap-2 font-bold" data-testid="button-new-quiz"><Plus className="h-4 w-4" /> New quiz</Button></Link>
-              <Link href="/groups"><Button variant="outline" className="gap-2 font-bold">Manage groups</Button></Link>
+              <Link href="/quizzes/new"><Button className="gap-2 font-bold" data-testid="button-new-quiz"><Plus className="h-4 w-4" /> {t("dash.newQuiz")}</Button></Link>
+              <Link href="/groups"><Button variant="outline" className="gap-2 font-bold">{t("dash.manageGroups")}</Button></Link>
             </>
           ) : (
             <>
-              <Link href="/quizzes"><Button className="gap-2 font-bold">Take a quiz <ArrowRight className="h-4 w-4" /></Button></Link>
-              <Link href="/sessions"><Button variant="outline" className="gap-2 font-bold">Join a session</Button></Link>
+              <Link href="/quizzes"><Button className="gap-2 font-bold">{t("dash.takeQuiz")} <ArrowRight className="h-4 w-4" /></Button></Link>
+              <Link href="/sessions"><Button variant="outline" className="gap-2 font-bold">{t("dash.joinSession")}</Button></Link>
             </>
           )}
         </div>
@@ -58,25 +58,25 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {isTeacher && (
-          <StatCard icon={Users} label="Groups" value={groups?.length} color="violet" href="/groups" />
+          <StatCard icon={Users} label={t("dash.stat.groups")} value={groups?.length} color="violet" href="/groups" />
         )}
-        <StatCard icon={FileQuestion} label={isTeacher ? "Quizzes" : "Available quizzes"} value={quizzes?.length} color="pink" href="/quizzes" />
-        <StatCard icon={Video} label="Live sessions" value={sessions?.length} color="teal" href="/sessions" />
+        <StatCard icon={FileQuestion} label={isTeacher ? t("dash.stat.quizzes") : t("dash.stat.availableQuizzes")} value={quizzes?.length} color="pink" href="/quizzes" />
+        <StatCard icon={Video} label={t("dash.stat.sessions")} value={sessions?.length} color="teal" href="/sessions" />
         {!isTeacher && (
-          <StatCard icon={Trophy} label="My results" value={(quizzes as StudentQuiz[] | undefined)?.filter((q) => q.submission).length} color="amber" href="/results" />
+          <StatCard icon={Trophy} label={t("dash.stat.myResults")} value={(quizzes as StudentQuiz[] | undefined)?.filter((q) => q.submission).length} color="amber" href="/results" />
         )}
       </div>
 
       {/* Upcoming sessions */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black">Upcoming live sessions</h2>
-          <Link href="/sessions" className="text-sm font-bold text-primary hover:underline">View all</Link>
+          <h2 className="text-lg font-black">{t("dash.upcomingSessions")}</h2>
+          <Link href="/sessions" className="text-sm font-bold text-primary hover:underline">{t("dash.viewAll")}</Link>
         </div>
         {!sessions ? (
           <Skeleton className="h-24 w-full rounded-2xl" />
         ) : sessions.length === 0 ? (
-          <EmptyRow text="No sessions scheduled yet." />
+          <EmptyRow text={t("dash.noSessions")} />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {sessions.slice(0, 4).map((s) => (
@@ -89,7 +89,7 @@ export default function Dashboard() {
                   <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarClock className="h-3 w-3" /> {fmt(s.startAt)}</p>
                 </div>
                 <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" className="font-bold">Join</Button>
+                  <Button size="sm" className="font-bold">{t("dash.join")}</Button>
                 </a>
               </Card>
             ))}

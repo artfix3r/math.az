@@ -19,7 +19,10 @@ export const insertUserSchema = createInsertSchema(users)
   .extend({
     email: z.string().email(),
     username: z.string().min(2),
-    password: z.string().min(4),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[^A-Za-z0-9]/, "Password needs a special character"),
     fullName: z.string().min(1),
     role: z.enum(["teacher", "student"]).default("student"),
   });
@@ -78,11 +81,23 @@ export const quizzes = sqliteTable("quizzes", {
 
 export const questionSchema = z.object({
   id: z.string(),
-  type: z.enum(["mcq", "open", "photo"]),
+  type: z.enum([
+    "mcq",
+    "open",
+    "photo",
+    "true_false",
+    "fill_blank",
+    "numeric",
+    "multi_select",
+  ]),
   prompt: z.string().min(1),
   imageUrl: z.string().optional().default(""),
   options: z.array(z.string()).optional().default([]),
   correctIndex: z.number().optional(),
+  correctIndexes: z.array(z.number()).optional().default([]),
+  correctText: z.string().optional().default(""),
+  correctNumber: z.number().optional(),
+  tolerance: z.number().optional().default(0),
   points: z.number().default(1),
 });
 

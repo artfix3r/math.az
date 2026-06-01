@@ -2,33 +2,66 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Logo, colorOf } from "@/lib/ui";
+import { useT, LANGUAGES, Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   LayoutDashboard, Users, FileQuestion, Library, BarChart3,
-  Video, Trophy, LogOut, Moon, Sun, Menu, X,
+  Video, Trophy, LogOut, Moon, Sun, Menu, Globe,
 } from "lucide-react";
 
-type NavItem = { href: string; label: string; icon: React.ElementType };
+type NavItem = { href: string; key: string; icon: React.ElementType };
 
 const TEACHER_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/groups", label: "Groups", icon: Users },
-  { href: "/quizzes", label: "Quizzes", icon: FileQuestion },
-  { href: "/library", label: "Quiz Library", icon: Library },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/sessions", label: "Live Sessions", icon: Video },
+  { href: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/groups", key: "nav.groups", icon: Users },
+  { href: "/quizzes", key: "nav.quizzes", icon: FileQuestion },
+  { href: "/library", key: "nav.library", icon: Library },
+  { href: "/analytics", key: "nav.analytics", icon: BarChart3 },
+  { href: "/sessions", key: "nav.sessions", icon: Video },
 ];
 
 const STUDENT_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/quizzes", label: "Quizzes", icon: FileQuestion },
-  { href: "/sessions", label: "Live Sessions", icon: Video },
-  { href: "/results", label: "My Results", icon: Trophy },
+  { href: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/quizzes", key: "nav.quizzes", icon: FileQuestion },
+  { href: "/sessions", key: "nav.sessions", icon: Video },
+  { href: "/results", key: "nav.results", icon: Trophy },
 ];
+
+export function LanguageSwitcher() {
+  const { lang, setLang, t } = useT();
+  const cur = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2 font-bold" aria-label={t("common.language")} data-testid="button-language">
+          <Globe className="h-4 w-4" />
+          <span className="hidden sm:inline">{cur.flag} {cur.label}</span>
+          <span className="sm:hidden">{cur.flag}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {LANGUAGES.map((l) => (
+          <DropdownMenuItem
+            key={l.code}
+            onClick={() => setLang(l.code as Lang)}
+            className={cn("gap-2 font-bold", l.code === lang && "bg-primary/10 text-primary")}
+            data-testid={`language-${l.code}`}
+          >
+            <span>{l.flag}</span> {l.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { t } = useT();
   const [, navigate] = useLocation();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
@@ -54,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+              data-testid={`nav-${item.href.slice(1)}`}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors",
                 Active
@@ -63,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <item.icon className="h-[18px] w-[18px]" />
-              {item.label}
+              {t(item.key)}
             </Link>
           );
         })}
@@ -75,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold" data-testid="text-username">{user?.fullName}</p>
-            <p className="truncate text-xs capitalize text-muted-foreground">{user?.role}</p>
+            <p className="truncate text-xs capitalize text-muted-foreground">{t(`common.role_${user?.role}`)}</p>
           </div>
         </div>
         <Button
@@ -85,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClick={() => { logout(); navigate("/"); }}
           data-testid="button-logout"
         >
-          <LogOut className="h-4 w-4" /> Sign out
+          <LogOut className="h-4 w-4" /> {t("nav.signout")}
         </Button>
       </div>
     </div>
@@ -112,6 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex-1" />
+          <LanguageSwitcher />
           <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle theme" data-testid="button-theme">
             <Sun className="h-5 w-5 dark:hidden" />
             <Moon className="hidden h-5 w-5 dark:block" />

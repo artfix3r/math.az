@@ -246,10 +246,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     for (const q of questions) {
       maxScore += q.points;
       const a = answers[q.id];
-      if (q.type === "mcq") {
-        if (a && Number(a.answer) === q.correctIndex) score += q.points;
+      if (q.type === "mcq" || q.type === "true_false") {
+        // single correct index
+        if (a && a.answer !== "" && a.answer !== undefined && Number(a.answer) === q.correctIndex)
+          score += q.points;
+      } else if (q.type === "multi_select") {
+        // answer is a comma-separated list of selected indexes; exact set match
+        const selected = new Set(
+          a && a.answer !== "" && a.answer !== undefined
+            ? String(a.answer).split(",").filter((x) => x !== "").map((x) => Number(x))
+            : []
+        );
+        const correct = new Set((q.correctIndexes ?? []).map((x) => Number(x)));
+        if (
+          selected.size === correct.size &&
+          Array.from(selected).every((x) => correct.has(x))
+        )
+          score += q.points;
+      } else if (q.type === "fill_blank") {
+        // case-insensitive trimmed match
+        const given = a ? String(a.answer ?? "").trim().toLowerCase() : "";
+        if (given && given === String(q.correctText ?? "").trim().toLowerCase())
+          score += q.points;
+      } else if (q.type === "numeric") {
+        // within tolerance of correctNumber
+        const given = a && a.answer !== "" && a.answer !== undefined ? Number(a.answer) : NaN;
+        const target = q.correctNumber;
+        const tol = q.tolerance ?? 0;
+        if (!Number.isNaN(given) && target !== undefined && Math.abs(given - target) <= tol)
+          score += q.points;
       } else {
-        if (a && String(a.answer).trim()) needsGrading = 1;
+        // open / photo -> manual grading
+        if (a && String(a.answer ?? "").trim()) needsGrading = 1;
       }
     }
     const sub = await storage.createSubmission({
@@ -318,7 +346,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       avgPercent: Math.round(v.scores.reduce((a, b) => a + b, 0) / v.scores.length),
       attempts: v.scores.length,
     }));
-    res.json({ perQuiz, perStudent });
+
+    // ----- Class-level aggregates -----
+    const allScores: number[] = Object.values(studentMap).flatMap((v) => v.scores);
+    const totalSubmissions = perQuiz.reduce((a, q) => a + q.submissions, 0);
+    const totalNeedsGrading = perQuiz.reduce((a, q) => a + q.needsGrading, 0);
+    const classAvg = allScores.length
+      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+      : 0;
+    // score distribution across all student attempts
+    const distribution = [
+      { band: "high", label: "70-100%", count: allScores.filter((s) => s >= 70).length },
+      { band: "mid", label: "40-69%", count: allScores.filter((s) => s >= 40 && s < 70).length },
+      { band: "low", label: "0-39%", count: allScores.filter((s) => s < 40).length },
+    ];
+    const classStats = {
+      classAvg,
+      totalStudents: perStudent.length,
+      totalQuizzes: quizzes.length,
+      totalSubmissions,
+      totalNeedsGrading,
+      distribution,
+    };
+    res.json({ perQuiz, perStudent, classStats });
   });
 
   // ---------------- Sessions ----------------
