@@ -32,11 +32,24 @@ export default function Dashboard() {
     return h < 12 ? t("dash.morning") : h < 18 ? t("dash.afternoon") : t("dash.evening");
   })();
 
+  // Split sessions into today vs. upcoming for the schedule view
+  const now = Date.now();
+  const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); })();
+  const futureSessions = (sessions ?? [])
+    .filter((s) => !s.startAt || s.startAt >= now - 60 * 60 * 1000)
+    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
+  const todaySessions = futureSessions.filter((s) => s.startAt && s.startAt <= endOfToday);
+  const laterSessions = futureSessions.filter((s) => !s.startAt || s.startAt > endOfToday);
+  const timeOnly = (ts?: number | null) =>
+    ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("quiz.anytime");
+
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-pink-500/10 p-6 sm:p-8">
         <p className="text-sm font-bold text-primary">{greeting} 👋</p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">{user?.fullName}</h1>
+        <h1 className="mt-1 text-3xl font-black tracking-tight" data-testid="text-greeting">
+          {t("dash.helloRole", { role: isTeacher ? t("landing.teacher") : t("landing.student"), name: user?.fullName ?? "" })}
+        </h1>
         <p className="mt-2 max-w-lg text-sm text-muted-foreground">
           {isTeacher ? t("dash.teacherSub") : t("dash.studentSub")}
         </p>
@@ -67,32 +80,46 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Upcoming sessions */}
+      {/* Today's schedule + upcoming */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black">{t("dash.upcomingSessions")}</h2>
+          <h2 className="text-lg font-black">{t("dash.todaySchedule")}</h2>
           <Link href="/sessions" className="text-sm font-bold text-primary hover:underline">{t("dash.viewAll")}</Link>
         </div>
         {!sessions ? (
           <Skeleton className="h-24 w-full rounded-2xl" />
-        ) : sessions.length === 0 ? (
-          <EmptyRow text={t("dash.noSessions")} />
+        ) : futureSessions.length === 0 ? (
+          <EmptyRow text={t("dash.noSchedule")} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {sessions.slice(0, 4).map((s) => (
-              <Card key={s.id} className="flex items-center gap-3 p-4">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300">
-                  <Video className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold">{s.title}</p>
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarClock className="h-3 w-3" /> {fmt(s.startAt)}</p>
+          <div className="space-y-5">
+            {/* Today */}
+            <div>
+              <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground" data-testid="label-today">
+                <span className="flex h-2 w-2 rounded-full bg-pink-500" /> {t("dash.today")}
+              </p>
+              {todaySessions.length === 0 ? (
+                <EmptyRow text={t("dash.nothingToday")} />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {todaySessions.map((s) => (
+                    <SessionRow key={s.id} s={s} time={timeOnly(s.startAt)} joinLabel={t("dash.join")} highlight />
+                  ))}
                 </div>
-                <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" className="font-bold">{t("dash.join")}</Button>
-                </a>
-              </Card>
-            ))}
+              )}
+            </div>
+            {/* Later / upcoming */}
+            {laterSessions.length > 0 && (
+              <div>
+                <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground" data-testid="label-upcoming">
+                  <span className="flex h-2 w-2 rounded-full bg-violet-500" /> {t("dash.upcoming")}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {laterSessions.slice(0, 4).map((s) => (
+                    <SessionRow key={s.id} s={s} time={fmt(s.startAt)} joinLabel={t("dash.join")} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -114,6 +141,23 @@ function StatCard({ icon: Icon, label, value, color, href }: { icon: React.Eleme
         </div>
       </Card>
     </Link>
+  );
+}
+
+function SessionRow({ s, time, joinLabel, highlight }: { s: ClassSession; time: string; joinLabel: string; highlight?: boolean }) {
+  return (
+    <Card className={cn("flex items-center gap-3 p-4", highlight && "border-pink-500/40 bg-pink-500/5")} data-testid={`card-session-${s.id}`}>
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300">
+        <Video className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-bold">{s.title}</p>
+        <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarClock className="h-3 w-3" /> {time}</p>
+      </div>
+      <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer">
+        <Button size="sm" className="font-bold">{joinLabel}</Button>
+      </a>
+    </Card>
   );
 }
 

@@ -136,9 +136,6 @@ export default function Landing() {
                 <TabsTrigger value="register" data-testid="tab-register">{t("landing.register")}</TabsTrigger>
               </TabsList>
 
-              {/* Role selector (shown for register + google) */}
-              <RolePicker role={role} setRole={setRole} className="mt-5" />
-
               <TabsContent value="signin" className="mt-4">
                 {!showGoogle ? (
                   <form onSubmit={handleSignIn} className="space-y-3">
@@ -153,12 +150,16 @@ export default function Landing() {
                     </Button>
                   </form>
                 ) : (
-                  <GoogleForm onSubmit={handleGoogle} gEmail={gEmail} setGEmail={setGEmail} gName={gName} setGName={setGName} loading={loading} t={t} />
+                  <div className="space-y-4">
+                    <RolePicker role={role} setRole={setRole} hint={t("landing.googleRoleHint")} />
+                    <GoogleForm onSubmit={handleGoogle} gEmail={gEmail} setGEmail={setGEmail} gName={gName} setGName={setGName} loading={loading} t={t} />
+                  </div>
                 )}
               </TabsContent>
 
               <TabsContent value="register" className="mt-4">
                 <form onSubmit={handleRegister} className="space-y-3">
+                  <RolePicker role={role} setRole={setRole} />
                   <Field label={t("landing.fullName")}>
                     <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ada Lovelace" data-testid="input-fullname" required />
                   </Field>
@@ -191,9 +192,11 @@ export default function Landing() {
               <SiGoogle className="h-4 w-4" />
               {showGoogle ? t("landing.useEmail") : t("landing.continueGoogle")}
             </Button>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              {t("landing.signingInAs")} <span className="font-bold text-foreground">{t(`landing.${role}`)}</span>
-            </p>
+            {(mode === "register" || showGoogle) && (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                {t("landing.signingInAs")} <span className="font-bold text-foreground">{t(`landing.${role}`)}</span>
+              </p>
+            )}
           </Card>
         </div>
       </div>
@@ -201,11 +204,12 @@ export default function Landing() {
   );
 }
 
-function RolePicker({ role, setRole, className }: { role: Role; setRole: (r: Role) => void; className?: string }) {
+function RolePicker({ role, setRole, className, hint }: { role: Role; setRole: (r: Role) => void; className?: string; hint?: string }) {
   const { t } = useT();
   return (
     <div className={className}>
       <Label className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("landing.iAmA")}</Label>
+      {hint && <p className="-mt-1 mb-2 text-xs text-muted-foreground">{hint}</p>}
       <div className="grid grid-cols-2 gap-2">
         {(["student", "teacher"] as Role[]).map((r) => (
           <button
