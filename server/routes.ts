@@ -8,6 +8,9 @@ import {
 } from "@shared/schema";
 import type { Question, Quiz, User } from "@shared/schema";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
+
+const BCRYPT_ROUNDS = 10;
 
 const COLORS = ["violet", "pink", "amber", "teal", "blue", "green"];
 function randColor() {
@@ -48,7 +51,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(409).json({ message: "Email already registered" });
       if (await storage.getUserByUsername(data.username))
         return res.status(409).json({ message: "Username already taken" });
-      const user = await storage.createUser(data);
+      const hashedPassword = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+      const user = await storage.createUser({ ...data, password: hashedPassword });
       res.json(sanitize(user));
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
@@ -62,7 +66,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const user = identifier.includes("@")
         ? await storage.getUserByEmail(identifier)
         : await storage.getUserByUsername(identifier);
-      if (!user || user.password !== password)
+      if (!user || !(await bcrypt.compare(password, user.password)))
         return res.status(401).json({ message: "Invalid credentials" });
       res.json(sanitize(user));
     } catch (e) {
@@ -86,7 +90,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (await storage.getUserByUsername(username)) username += Math.floor(Math.random() * 1000);
         user = await storage.createUser({
           email, username, fullName, role,
-          password: "google-" + Math.random().toString(36).slice(2),
+          password: await bcrypt.hash("google-" + Math.random().toString(36).slice(2), BCRYPT_ROUNDS),
           avatarColor: randColor(),
         });
       }
