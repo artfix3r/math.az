@@ -289,9 +289,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Teacher grades open/photo questions
   app.patch("/api/submissions/:id/grade", requireUser, requireTeacher, async (req, res) => {
-    const { score, needsGrading } = req.body;
+    const { score, needsGrading, gradedPoints } = req.body;
     const updated = await storage.updateSubmission(Number(req.params.id), {
       score, needsGrading: needsGrading ? 1 : 0,
+      gradedPoints: typeof gradedPoints === "string" ? gradedPoints : JSON.stringify(gradedPoints ?? {}),
     });
     res.json(updated);
   });

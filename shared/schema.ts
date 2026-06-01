@@ -122,6 +122,8 @@ export const submissions = sqliteTable("submissions", {
   score: integer("score").notNull().default(0),
   maxScore: integer("max_score").notNull().default(0),
   needsGrading: integer("needs_grading").notNull().default(0),
+  // JSON map of questionId -> awarded points, saved when a teacher grades. "{}" until graded.
+  gradedPoints: text("graded_points").notNull().default("{}"),
   submittedAt: integer("submitted_at").notNull(),
 });
 

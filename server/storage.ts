@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   score INTEGER NOT NULL DEFAULT 0,
   max_score INTEGER NOT NULL DEFAULT 0,
   needs_grading INTEGER NOT NULL DEFAULT 0,
+  graded_points TEXT NOT NULL DEFAULT '{}',
   submitted_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (

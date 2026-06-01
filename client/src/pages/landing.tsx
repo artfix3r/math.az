@@ -12,7 +12,6 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GraduationCap, Users, FileQuestion, Video, BarChart3, Loader2 } from "lucide-react";
-import { SiGoogle } from "react-icons/si";
 
 type Role = "teacher" | "student";
 
@@ -24,7 +23,6 @@ export default function Landing() {
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [role, setRole] = useState<Role>("student");
   const [loading, setLoading] = useState(false);
-  const [showGoogle, setShowGoogle] = useState(false);
 
   // sign in
   const [identifier, setIdentifier] = useState("");
@@ -34,9 +32,6 @@ export default function Landing() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  // google
-  const [gEmail, setGEmail] = useState("");
-  const [gName, setGName] = useState("");
 
   useEffect(() => {
     if (user) navigate("/dashboard");
@@ -71,21 +66,6 @@ export default function Landing() {
       toast({ title: t("landing.welcome"), description: t("landing.accountCreated", { role: t(`landing.${role}`) }) });
     } catch (err: any) {
       toast({ title: t("landing.cantRegister"), description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogle(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await apiRequest("POST", "/api/auth/google", {
-        email: gEmail, fullName: gName || gEmail.split("@")[0], role,
-      });
-      finish(await res.json());
-    } catch (err: any) {
-      toast({ title: t("landing.googleFailed"), description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -137,24 +117,17 @@ export default function Landing() {
               </TabsList>
 
               <TabsContent value="signin" className="mt-4">
-                {!showGoogle ? (
-                  <form onSubmit={handleSignIn} className="space-y-3">
-                    <Field label={t("landing.emailOrUsername")}>
-                      <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="you@email.com" data-testid="input-identifier" required />
-                    </Field>
-                    <Field label={t("landing.password")}>
-                      <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="input-password" required />
-                    </Field>
-                    <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-signin">
-                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.signin")}
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="space-y-4">
-                    <RolePicker role={role} setRole={setRole} hint={t("landing.googleRoleHint")} />
-                    <GoogleForm onSubmit={handleGoogle} gEmail={gEmail} setGEmail={setGEmail} gName={gName} setGName={setGName} loading={loading} t={t} />
-                  </div>
-                )}
+                <form onSubmit={handleSignIn} className="space-y-3">
+                  <Field label={t("landing.emailOrUsername")}>
+                    <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="you@email.com" data-testid="input-identifier" required />
+                  </Field>
+                  <Field label={t("landing.password")}>
+                    <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="input-password" required />
+                  </Field>
+                  <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-signin">
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.signin")}
+                  </Button>
+                </form>
               </TabsContent>
 
               <TabsContent value="register" className="mt-4">
@@ -180,20 +153,8 @@ export default function Landing() {
               </TabsContent>
             </Tabs>
 
-            <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="h-px flex-1 bg-border" /> {t("landing.or")} <span className="h-px flex-1 bg-border" />
-            </div>
-            <Button
-              variant="outline"
-              className="w-full gap-2 font-bold"
-              onClick={() => { setMode("signin"); setShowGoogle((s) => !s); }}
-              data-testid="button-google-toggle"
-            >
-              <SiGoogle className="h-4 w-4" />
-              {showGoogle ? t("landing.useEmail") : t("landing.continueGoogle")}
-            </Button>
-            {(mode === "register" || showGoogle) && (
-              <p className="mt-3 text-center text-xs text-muted-foreground">
+            {mode === "register" && (
+              <p className="mt-4 text-center text-xs text-muted-foreground">
                 {t("landing.signingInAs")} <span className="font-bold text-foreground">{t(`landing.${role}`)}</span>
               </p>
             )}
@@ -204,12 +165,11 @@ export default function Landing() {
   );
 }
 
-function RolePicker({ role, setRole, className, hint }: { role: Role; setRole: (r: Role) => void; className?: string; hint?: string }) {
+function RolePicker({ role, setRole, className }: { role: Role; setRole: (r: Role) => void; className?: string }) {
   const { t } = useT();
   return (
     <div className={className}>
       <Label className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("landing.iAmA")}</Label>
-      {hint && <p className="-mt-1 mb-2 text-xs text-muted-foreground">{hint}</p>}
       <div className="grid grid-cols-2 gap-2">
         {(["student", "teacher"] as Role[]).map((r) => (
           <button
@@ -239,22 +199,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function GoogleForm({ onSubmit, gEmail, setGEmail, gName, setGName, loading, t }: any) {
-  return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div className="rounded-xl border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
-        {t("landing.googleNote")}
-      </div>
-      <Field label={t("landing.gmail")}>
-        <Input type="email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="you@gmail.com" data-testid="input-gemail" required />
-      </Field>
-      <Field label={t("landing.yourNameFirst")}>
-        <Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Ada Lovelace" data-testid="input-gname" />
-      </Field>
-      <Button type="submit" className="w-full gap-2 font-bold" disabled={loading} data-testid="button-google-signin">
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        <SiGoogle className="h-4 w-4" /> {t("landing.continueGoogle")}
-      </Button>
-    </form>
-  );
-}

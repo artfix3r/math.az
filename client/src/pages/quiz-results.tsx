@@ -12,7 +12,7 @@ import { useT } from "@/lib/i18n";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Hourglass, CheckCircle2, Pencil } from "lucide-react";
+import { ArrowLeft, Hourglass, CheckCircle2, Pencil, Plus, Minus } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
@@ -21,6 +21,7 @@ import type { Quiz, Question } from "@shared/schema";
 type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
+  gradedPoints?: string;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -93,10 +94,48 @@ export default function QuizResults({ id }: { id: number }) {
   );
 }
 
+// Auto-graded correctness for a single question given the student's raw answer.
+// Returns true/false for objective types, or null for open/photo (teacher decides).
+function isCorrect(q: Question, a: string | number | undefined): boolean | null {
+  if (a === undefined || a === "") return q.type === "open" || q.type === "photo" ? null : false;
+  if (q.type === "mcq" || q.type === "true_false") return Number(a) === q.correctIndex;
+  if (q.type === "multi_select") {
+    const selected = String(a).split(",").filter((x) => x !== "").map(Number);
+    const correct = new Set((q.correctIndexes ?? []).map(Number));
+    return selected.length === correct.size && selected.every((x) => correct.has(x));
+  }
+  if (q.type === "fill_blank") return String(a).trim().toLowerCase() === String(q.correctText ?? "").trim().toLowerCase();
+  if (q.type === "numeric") return q.correctNumber !== undefined && Math.abs(Number(a) - q.correctNumber) <= (q.tolerance ?? 0);
+  return null; // open / photo
+}
+
 function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[]; onGraded: () => void }) {
   const { t } = useT();
-  const [score, setScore] = useState(sub.score);
   const answers: Record<string, { answer: string | number }> = JSON.parse(sub.answers || "{}");
+
+  // Per-question awarded points. If this submission was already graded, reload the
+  // teacher's saved per-question points so re-opening the dialog shows their work.
+  // Otherwise seed objective types from auto-grading and leave open/photo at 0.
+  let saved: Record<string, number> = {};
+  try { saved = JSON.parse(sub.gradedPoints || "{}") || {}; } catch { saved = {}; }
+  const hasSaved = Object.keys(saved).length > 0;
+  const seed: Record<string, number> = {};
+  for (const q of questions) {
+    if (hasSaved) {
+      const v = Number(saved[q.id]);
+      seed[q.id] = Number.isFinite(v) ? Math.max(0, Math.min(q.points, v)) : 0;
+    } else {
+      const a = answers[q.id]?.answer;
+      seed[q.id] = isCorrect(q, a) === true ? q.points : 0;
+    }
+  }
+  const [points, setPoints] = useState<Record<string, number>>(seed);
+  const total = questions.reduce((acc, q) => acc + (Number(points[q.id]) || 0), 0);
+
+  function setQ(id: string, val: number, max: number) {
+    const clamped = Math.max(0, Math.min(max, isNaN(val) ? 0 : val));
+    setPoints((p) => ({ ...p, [id]: clamped }));
+  }
 
   const tfLabel = (i: number) => (i === 0 ? t("qb.true") : t("qb.false"));
   function renderAnswer(q: Question, a: string | number | undefined) {
@@ -149,7 +188,7 @@ function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[];
   }
 
   const grade = useMutation({
-    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: Number(score), needsGrading: 0 }),
+    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: total, needsGrading: 0, gradedPoints: JSON.stringify(points) }),
     onSuccess: onGraded,
   });
 
@@ -173,24 +212,46 @@ function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[];
         </DialogTrigger>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t("qr.grade")} — {sub.studentName}</DialogTitle></DialogHeader>
+          <p className="-mt-1 text-sm text-muted-foreground">{t("qr.gradeHint")}</p>
           <div className="space-y-4">
             {questions.map((q, idx) => {
               const a = answers[q.id]?.answer;
+              const c = isCorrect(q, a);
+              const isManual = c === null;
+              const awarded = Number(points[q.id]) || 0;
               return (
-                <div key={q.id} className="rounded-xl border p-3">
-                  <p className="text-xs font-bold text-muted-foreground">Q{idx + 1} · {t(`qtype.${q.type}`)} · {q.points} {t("common.points_short")}</p>
+                <div key={q.id} className={"rounded-xl border p-3 " + (isManual ? "border-violet-400/60 bg-violet-50/40 dark:bg-violet-950/20" : "")}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-bold text-muted-foreground">Q{idx + 1} · {t(`qtype.${q.type}`)} · {t("qr.maxPoints", { max: q.points })}</p>
+                    {c === true && <Badge className="bg-green-500 text-white">{t("qr.autoCorrect")}</Badge>}
+                    {c === false && <Badge variant="destructive">{t("qr.autoWrong")}</Badge>}
+                    {isManual && <Badge className="bg-violet-500 text-white">{t("qr.manualGrade")}</Badge>}
+                  </div>
                   <p className="mt-1 font-bold">{q.prompt}</p>
                   {q.type === "photo" && q.imageUrl && <img src={q.imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border object-contain" />}
-                  {renderAnswer(q, a)}
+                  {isManual ? (
+                    <div className="mt-2">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("qr.studentSolution")}</p>
+                      {renderAnswer(q, a)}
+                    </div>
+                  ) : (
+                    renderAnswer(q, a)
+                  )}
+                  <div className="mt-3 flex items-center gap-2 border-t pt-3">
+                    <span className="mr-auto text-sm font-bold">{t("qr.pointsAwarded")}</span>
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => setQ(q.id, awarded - 1, q.points)} disabled={awarded <= 0} data-testid={`button-minus-${sub.id}-${q.id}`}><Minus className="h-4 w-4" /></Button>
+                    <Input type="number" min={0} max={q.points} value={awarded} onChange={(e) => setQ(q.id, Number(e.target.value), q.points)} className="w-16 text-center" data-testid={`input-points-${sub.id}-${q.id}`} />
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => setQ(q.id, awarded + 1, q.points)} disabled={awarded >= q.points} data-testid={`button-plus-${sub.id}-${q.id}`}><Plus className="h-4 w-4" /></Button>
+                    <span className="text-sm text-muted-foreground">/ {q.points}</span>
+                  </div>
                 </div>
               );
             })}
           </div>
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-testid={`total-grade-${sub.id}`}>
               <span className="text-sm font-bold">{t("qr.totalScore")}</span>
-              <Input type="number" min={0} max={sub.maxScore} value={score} onChange={(e) => setScore(Number(e.target.value))} className="w-24" data-testid={`input-grade-${sub.id}`} />
-              <span className="text-sm text-muted-foreground">/ {sub.maxScore}</span>
+              <span className="font-black tabular-nums">{total} / {sub.maxScore}</span>
             </div>
             <Button onClick={() => grade.mutate()} disabled={grade.isPending} className="font-bold sm:ml-auto" data-testid={`button-save-grade-${sub.id}`}>{t("qr.saveGrade")}</Button>
           </DialogFooter>
