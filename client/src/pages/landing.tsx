@@ -5,12 +5,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { Logo, MathBackdrop } from "@/lib/ui";
 import { useT } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/pages/shell";
+import { GoogleSignInButton } from "@/lib/google-signin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { GraduationCap, Users, FileQuestion, Video, BarChart3, Loader2 } from "lucide-react";
 
 type Role = "teacher" | "student";
@@ -32,6 +36,8 @@ export default function Landing() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  // forgot password
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   useEffect(() => {
     if (user) navigate("/dashboard");
@@ -124,10 +130,22 @@ export default function Landing() {
                   <Field label={t("landing.password")}>
                     <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="input-password" required />
                   </Field>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setForgotOpen(true)}
+                      data-testid="link-forgot-password"
+                      className="text-xs font-bold text-primary hover:underline"
+                    >
+                      {t("landing.forgotPassword")}
+                    </button>
+                  </div>
                   <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-signin">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.signin")}
                   </Button>
                 </form>
+                <OrDivider />
+                <GoogleSignInButton role={role} onSuccess={finish} />
               </TabsContent>
 
               <TabsContent value="register" className="mt-4">
@@ -150,6 +168,8 @@ export default function Landing() {
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.createAccount", { role: t(`landing.${role}`) })}
                   </Button>
                 </form>
+                <OrDivider />
+                <GoogleSignInButton role={role} onSuccess={finish} />
               </TabsContent>
             </Tabs>
 
@@ -166,7 +186,87 @@ export default function Landing() {
           </p>
         </div>
       </div>
+
+      <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} />
     </div>
+  );
+}
+
+function OrDivider() {
+  const { t } = useT();
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <span className="h-px flex-1 bg-border" />
+      <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("landing.or")}</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+function ForgotPasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const { t } = useT();
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/auth/forgot-password", { email });
+      setSent(true);
+    } catch (err: any) {
+      toast({ title: t("landing.resetRequestFailed"), description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Reset internal state when the dialog closes so reopening starts fresh.
+  useEffect(() => {
+    if (!open) {
+      setSent(false);
+      setEmail("");
+      setLoading(false);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("landing.forgotTitle")}</DialogTitle>
+          <DialogDescription>
+            {sent ? t("landing.resetSentDesc") : t("landing.forgotDesc")}
+          </DialogDescription>
+        </DialogHeader>
+        {sent ? (
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)} className="w-full font-bold" data-testid="button-reset-sent-close">
+              {t("landing.gotIt")}
+            </Button>
+          </DialogFooter>
+        ) : (
+          <form onSubmit={submit} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-bold">{t("landing.email")}</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com"
+                data-testid="input-forgot-email"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-send-reset">
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.sendResetLink")}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

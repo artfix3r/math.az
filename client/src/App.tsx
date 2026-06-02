@@ -22,6 +22,7 @@ import Sessions from "@/pages/sessions";
 import TakeQuiz from "@/pages/take-quiz";
 import MyResults from "@/pages/my-results";
 import Feedback from "@/pages/feedback";
+import ResetPassword from "@/pages/reset-password";
 import { AppShell } from "@/pages/shell";
 import { Loader2 } from "lucide-react";
 
@@ -70,6 +71,8 @@ function AppRouter() {
       <Route path="/sessions">{() => <Protected><Sessions /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
       <Route path="/feedback" component={Feedback} />
+      <Route path="/reset-password/:token">{(p) => <ResetPassword token={p.token} />}</Route>
+      <Route path="/reset-password">{() => <ResetPassword token="" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

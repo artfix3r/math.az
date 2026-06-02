@@ -12,7 +12,11 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  // Nullable: users who sign up via Google have no local password until they
+  // explicitly set one through the reset flow.
+  password: text("password"),
+  // Google account subject id (the "sub" claim). Null for password-only users.
+  googleId: text("google_id").unique(),
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("student"),
   avatarColor: text("avatar_color").notNull().default("violet"),
@@ -23,12 +27,14 @@ export const insertUserSchema = createInsertSchema(users)
   .extend({
     email: z.string().email(),
     username: z.string().min(2),
+    // Local email/password registration requires a strong password.
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
       .regex(/[^A-Za-z0-9]/, "Password needs a special character"),
     fullName: z.string().min(1),
     role: z.enum(["teacher", "student"]).default("student"),
+    googleId: z.string().nullable().optional(),
   });
 
 export const loginSchema = z.object({
@@ -36,8 +42,41 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// Password rule shared by registration and reset, kept in one place.
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[^A-Za-z0-9]/, "Password needs a special character");
+
+// Sent from the client after Google Identity Services returns an ID token (JWT).
+export const googleAuthSchema = z.object({
+  credential: z.string().min(1), // the Google ID token (JWT)
+  role: z.enum(["teacher", "student"]).default("student"), // used only on first sign-in
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: passwordSchema,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// ---------------- Password reset tokens ----------------
+// A single-use token emailed to the user. expiresAt is epoch-ms (bigint).
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: ts("expires_at").notNull(),
+  used: integer("used").notNull().default(0), // 0 = unused, 1 = consumed
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 // ---------------- Groups ----------------
 export const groups = pgTable("groups", {

@@ -6,12 +6,39 @@ import {
   insertUserSchema, loginSchema, insertGroupSchema,
   insertQuizSchema, insertSessionSchema, questionSchema,
   insertFeedbackSchema, insertMaterialSchema,
+  googleAuthSchema, forgotPasswordSchema, resetPasswordSchema,
 } from "@shared/schema";
 import type { Question, Quiz, User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
+import { OAuth2Client } from "google-auth-library";
+import { sendResetEmail, isEmailConfigured } from "./mailer";
 
 const BCRYPT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// Google ID-token verifier. GOOGLE_CLIENT_ID must match the OAuth client used
+// by the frontend (the token's audience is checked against it).
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// Where reset links point. On Vercel this is the production URL; locally it is
+// the dev server. Falls back to localhost for safety.
+const APP_BASE_URL = (process.env.APP_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+
+// Build a unique, collision-safe username from an email local-part.
+async function uniqueUsernameFromEmail(email: string): Promise<string> {
+  const base = (email.split("@")[0] || "user").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 24) || "user";
+  let candidate = base;
+  let n = 0;
+  // Try base, base1, base2, ... until free.
+  while (await storage.getUserByUsername(candidate)) {
+    n += 1;
+    candidate = `${base}${n}`;
+  }
+  return candidate;
+}
 
 const COLORS = ["violet", "pink", "amber", "teal", "blue", "green"];
 function randColor() {
@@ -67,7 +94,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const user = identifier.includes("@")
         ? await storage.getUserByEmail(identifier)
         : await storage.getUserByUsername(identifier);
-      if (!user || !(await bcrypt.compare(password, user.password)))
+      if (!user || !user.password || !(await bcrypt.compare(password, user.password)))
         return res.status(401).json({ message: "Invalid credentials" });
       res.json(sanitize(user));
     } catch (e) {
@@ -77,6 +104,106 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/auth/me", requireUser, async (req, res) => {
     res.json(sanitize((req as any).user));
+  });
+
+  // Sign in / sign up with Google. The client sends the Google ID token from
+  // Google Identity Services; we verify it server-side, then find-or-create a
+  // local user keyed on the Google subject id (falling back to email match so
+  // an existing password user can link their Google account).
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      if (!GOOGLE_CLIENT_ID)
+        return res.status(503).json({ message: "Google sign-in is not configured on the server" });
+      const { credential, role } = googleAuthSchema.parse(req.body);
+      let payload;
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: GOOGLE_CLIENT_ID,
+        });
+        payload = ticket.getPayload();
+      } catch {
+        return res.status(401).json({ message: "Invalid Google token" });
+      }
+      if (!payload || !payload.sub || !payload.email)
+        return res.status(401).json({ message: "Google token missing required claims" });
+      if (payload.email_verified === false)
+        return res.status(401).json({ message: "Your Google email is not verified" });
+
+      const googleId = payload.sub;
+      const email = payload.email.toLowerCase();
+      const fullName = payload.name || email.split("@")[0];
+
+      // 1) Already linked by googleId.
+      let user = await storage.getUserByGoogleId(googleId);
+      // 2) Existing account with the same email -> link the Google id.
+      if (!user) {
+        const byEmail = await storage.getUserByEmail(email);
+        if (byEmail) {
+          user = (await storage.linkGoogleId(byEmail.id, googleId)) ?? byEmail;
+        }
+      }
+      // 3) Brand-new user -> create one (no local password yet).
+      if (!user) {
+        const username = await uniqueUsernameFromEmail(email);
+        user = await storage.createUser({
+          email,
+          username,
+          password: null as any, // Google-only account; password set later via reset
+          fullName,
+          role,
+          avatarColor: randColor(),
+          googleId,
+        } as any);
+      }
+      res.json(sanitize(user));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Google sign-in failed" });
+    }
+  });
+
+  // Request a password reset link by email. Always returns ok (no account
+  // enumeration). Sends the email only if a matching user exists.
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      if (!isEmailConfigured())
+        return res.status(503).json({ message: "Email is not configured on the server" });
+      const user = await storage.getUserByEmail(email.toLowerCase());
+      if (user) {
+        const token = randomBytes(32).toString("hex");
+        await storage.createResetToken(user.id, token, Date.now() + RESET_TOKEN_TTL_MS);
+        const resetUrl = `${APP_BASE_URL}/#/reset-password/${token}`;
+        try {
+          await sendResetEmail(user.email, resetUrl, user.fullName);
+        } catch {
+          return res.status(500).json({ message: "Could not send the reset email. Please try again." });
+        }
+      }
+      // Uniform response regardless of whether the email exists.
+      res.json({ ok: true });
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Could not process the request" });
+    }
+  });
+
+  // Consume a reset token and set a new password.
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = resetPasswordSchema.parse(req.body);
+      const record = await storage.getResetToken(token);
+      if (!record || record.used === 1 || record.expiresAt < Date.now())
+        return res.status(400).json({ message: "This reset link is invalid or has expired" });
+      const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      await storage.updateUserPassword(record.userId, hashed);
+      await storage.markResetTokenUsed(record.id);
+      res.json({ ok: true });
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Could not reset password" });
+    }
   });
 
   // ---------------- Groups ----------------

@@ -1,12 +1,12 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
-  materials, materialGroups,
+  materials, materialGroups, passwordResetTokens,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
   Quiz, InsertQuiz, Submission, InsertSubmission,
   ClassSession, InsertSession, Feedback, InsertFeedback,
-  Material, InsertMaterial, MaterialGroup,
+  Material, InsertMaterial, MaterialGroup, PasswordResetToken,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -107,9 +107,24 @@ CREATE TABLE IF NOT EXISTS material_groups (
   material_id INTEGER NOT NULL,
   group_id INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at BIGINT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+);
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS auto_submitted INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS attempt_number INTEGER NOT NULL DEFAULT 1;
+-- Google sign-in + nullable password (Google-only accounts have no local password).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT;
+ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
+    ALTER TABLE users ADD CONSTRAINT users_google_id_unique UNIQUE (google_id);
+  END IF;
+END $$;
 `);
 })();
 
@@ -118,8 +133,15 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUsersByIds(ids: number[]): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  linkGoogleId(userId: number, googleId: string): Promise<User | undefined>;
+  updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
+  // password reset tokens
+  createResetToken(userId: number, token: string, expiresAt: number): Promise<PasswordResetToken>;
+  getResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markResetTokenUsed(id: number): Promise<void>;
   // groups
   createGroup(g: InsertGroup): Promise<Group>;
   getGroupsByTeacher(teacherId: number): Promise<Group[]>;
@@ -184,9 +206,36 @@ export class DatabaseStorage implements IStorage {
     if (ids.length === 0) return [];
     return db.select().from(users).where(inArray(users.id, ids));
   }
+  async getUserByGoogleId(googleId: string) {
+    const rows = await db.select().from(users).where(eq(users.googleId, googleId));
+    return rows[0];
+  }
   async createUser(insertUser: InsertUser) {
     const rows = await db.insert(users).values(insertUser).returning();
     return rows[0];
+  }
+  async linkGoogleId(userId: number, googleId: string) {
+    const rows = await db.update(users).set({ googleId }).where(eq(users.id, userId)).returning();
+    return rows[0];
+  }
+  async updateUserPassword(userId: number, hashedPassword: string) {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+  }
+
+  // ---- password reset tokens ----
+  async createResetToken(userId: number, token: string, expiresAt: number) {
+    const rows = await db.insert(passwordResetTokens)
+      .values({ userId, token, expiresAt, used: 0 }).returning();
+    return rows[0];
+  }
+  async getResetToken(token: string) {
+    const rows = await db.select().from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return rows[0];
+  }
+  async markResetTokenUsed(id: number) {
+    await db.update(passwordResetTokens).set({ used: 1 })
+      .where(eq(passwordResetTokens.id, id));
   }
 
   // ---- groups ----
