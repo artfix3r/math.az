@@ -1,0 +1,28 @@
+# Render Blueprint for math.az
+# When you connect this repo on Render, it reads this file and configures everything.
+services:
+  - type: web
+    name: math-az
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
+# ---------------------------------------------------------------------------
+# DATA PERSISTENCE (optional, recommended for real use)
+# The FREE plan has NO persistent disk: the SQLite database resets whenever the
+# instance sleeps or redeploys. Fine for testing. To keep data permanently,
+# upgrade the service to a paid instance and add the block below under the
+# service, plus set DATABASE_PATH=/data/data.db as an env var:
+#
+#   disk:
+#     name: math-az-data
+#     mountPath: /data
+#     sizeGB: 1
+#
+# For production-grade, backed-up storage, a managed database (e.g. Supabase
+# or Postgres) is the more durable choice than a single SQLite file.
+# ---------------------------------------------------------------------------
