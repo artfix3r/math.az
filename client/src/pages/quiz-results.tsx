@@ -12,7 +12,11 @@ import { useT } from "@/lib/i18n";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Hourglass, CheckCircle2, Pencil, Plus, Minus } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Hourglass, CheckCircle2, Pencil, Plus, Minus, RotateCcw, Bot, Loader2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
@@ -21,7 +25,7 @@ import type { Quiz, Question } from "@shared/schema";
 type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
-  gradedPoints?: string;
+  gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -83,6 +87,10 @@ export default function QuizResults({ id }: { id: number }) {
                 queryClient.invalidateQueries({ queryKey: ["/api/quizzes", id, "submissions"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
                 toast({ title: t("qr.gradeSaved") });
+              }} onReopened={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/quizzes", id, "submissions"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+                toast({ title: t("qr.reopened") });
               }} />
             ))}
           </div>
@@ -109,8 +117,9 @@ function isCorrect(q: Question, a: string | number | undefined): boolean | null 
   return null; // open / photo
 }
 
-function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[]; onGraded: () => void }) {
+function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions: Question[]; onGraded: () => void; onReopened: () => void }) {
   const { t } = useT();
+  const { toast } = useToast();
   const answers: Record<string, { answer: string | number }> = JSON.parse(sub.answers || "{}");
 
   // Per-question awarded points. If this submission was already graded, reload the
@@ -192,6 +201,12 @@ function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[];
     onSuccess: onGraded,
   });
 
+  const reopen = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/submissions/${sub.id}`),
+    onSuccess: onReopened,
+    onError: (e: any) => toast({ title: t("qr.reopenError"), description: e.message, variant: "destructive" }),
+  });
+
   return (
     <Card className="flex items-center gap-3 p-4" data-testid={`submission-${sub.id}`}>
       <div className="min-w-0 flex-1">
@@ -200,11 +215,16 @@ function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[];
       </div>
       <div className="text-right">
         <p className="font-black tabular-nums">{sub.score} / {sub.maxScore}</p>
-        {sub.needsGrading ? (
-          <Badge className="gap-1 bg-amber-500 text-white"><Hourglass className="h-3 w-3" /> {t("qr.needsGrading")}</Badge>
-        ) : (
-          <Badge className="gap-1 bg-green-500 text-white"><CheckCircle2 className="h-3 w-3" /> {t("qr.graded")}</Badge>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {sub.needsGrading ? (
+            <Badge className="gap-1 bg-amber-500 text-white"><Hourglass className="h-3 w-3" /> {t("qr.needsGrading")}</Badge>
+          ) : (
+            <Badge className="gap-1 bg-green-500 text-white"><CheckCircle2 className="h-3 w-3" /> {t("qr.graded")}</Badge>
+          )}
+          {sub.autoSubmitted ? (
+            <Badge className="gap-1 bg-rose-500 text-white" data-testid={`badge-auto-${sub.id}`}><Bot className="h-3 w-3" /> {t("qr.autoSubmitted")}</Badge>
+          ) : null}
+        </div>
       </div>
       <Dialog>
         <DialogTrigger asChild>
@@ -257,6 +277,31 @@ function SubRow({ sub, questions, onGraded }: { sub: Sub; questions: Question[];
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="ghost" size="sm" className="gap-1.5 font-bold text-muted-foreground hover:text-foreground" data-testid={`button-reopen-${sub.id}`}>
+            <RotateCcw className="h-3.5 w-3.5" /> {t("qr.reopen")}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("qr.reopenTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("qr.reopenBody", { name: sub.studentName })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`button-reopen-cancel-${sub.id}`}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); reopen.mutate(); }}
+              disabled={reopen.isPending}
+              data-testid={`button-reopen-confirm-${sub.id}`}
+            >
+              {reopen.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t("qr.reopenConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

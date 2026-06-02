@@ -24,16 +24,23 @@ export default function TakeQuiz({ id }: { id: number }) {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [remaining, setRemaining] = useState<number | null>(null);
   const submittedRef = useRef(false);
+  const tabWarnedRef = useRef(false);
+  const autoSubmitRef = useRef(false);
 
   const questions: Question[] = quiz ? JSON.parse(quiz.questions || "[]") : [];
 
   const submit = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/quizzes/${id}/submit`, { answers })).json(),
+    mutationFn: async (autoSubmitted: boolean = false) =>
+      (await apiRequest("POST", `/api/quizzes/${id}/submit`, { answers, autoSubmitted })).json(),
     onSuccess: () => {
       submittedRef.current = true;
       queryClient.invalidateQueries({ queryKey: ["/api/quizzes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my/submissions"] });
-      toast({ title: t("tq.submitted"), description: t("tq.submittedSub") });
+      if (autoSubmitRef.current) {
+        toast({ title: t("tq.autoSubmitTitle"), description: t("tq.autoSubmitBody"), variant: "destructive" });
+      } else {
+        toast({ title: t("tq.submitted"), description: t("tq.submittedSub") });
+      }
       navigate("/results");
     },
     onError: (e: any) => toast({ title: t("tq.cantSubmit"), description: e.message, variant: "destructive" }),
@@ -50,12 +57,32 @@ export default function TakeQuiz({ id }: { id: number }) {
       setRemaining(r);
       if (r <= 0 && !submittedRef.current && !submit.isPending) {
         submittedRef.current = true;
-        submit.mutate();
+        submit.mutate(false);
       }
     };
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quiz]);
+
+  // tab-switch guard: warn once, auto-submit on the second switch away
+  useEffect(() => {
+    if (!quiz) return;
+    const handleLeave = () => {
+      if (!document.hidden) return;
+      if (submittedRef.current || submit.isPending) return;
+      if (!tabWarnedRef.current) {
+        tabWarnedRef.current = true;
+        toast({ title: t("tq.tabWarn"), description: t("tq.tabWarnBody"), variant: "destructive" });
+        return;
+      }
+      autoSubmitRef.current = true;
+      submittedRef.current = true;
+      submit.mutate(true);
+    };
+    document.addEventListener("visibilitychange", handleLeave);
+    return () => document.removeEventListener("visibilitychange", handleLeave);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quiz]);
 
@@ -211,7 +238,7 @@ export default function TakeQuiz({ id }: { id: number }) {
         ))}
       </div>
 
-      <Button onClick={() => submit.mutate()} disabled={submit.isPending} className="w-full gap-2 font-bold" size="lg" data-testid="button-submit-quiz">
+      <Button onClick={() => submit.mutate(false)} disabled={submit.isPending} className="w-full gap-2 font-bold" size="lg" data-testid="button-submit-quiz">
         {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("tq.submitQuiz")}
       </Button>
     </div>

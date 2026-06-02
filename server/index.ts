@@ -16,13 +16,16 @@ declare module "http" {
 
 app.use(
   express.json({
+    // Materials can be uploaded as base64 data URIs stored in the DB, so the
+    // body can be several MB. Raise the limit well above the 100kb default.
+    limit: "60mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "60mb" }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

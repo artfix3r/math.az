@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import {
   insertUserSchema, loginSchema, insertGroupSchema,
   insertQuizSchema, insertSessionSchema, questionSchema,
+  insertFeedbackSchema, insertMaterialSchema,
 } from "@shared/schema";
 import type { Question, Quiz, User } from "@shared/schema";
 import { z } from "zod";
@@ -71,32 +72,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json(sanitize(user));
     } catch (e) {
       res.status(400).json({ message: "Login failed" });
-    }
-  });
-
-  // Google sign-in: client posts verified Google profile (email, name).
-  // Auto-provisions an account; role chosen by client on first sign-in.
-  app.post("/api/auth/google", async (req, res) => {
-    try {
-      const schema = z.object({
-        email: z.string().email(),
-        fullName: z.string().min(1),
-        role: z.enum(["teacher", "student"]).default("student"),
-      });
-      const { email, fullName, role } = schema.parse(req.body);
-      let user = await storage.getUserByEmail(email);
-      if (!user) {
-        let username = email.split("@")[0];
-        if (await storage.getUserByUsername(username)) username += Math.floor(Math.random() * 1000);
-        user = await storage.createUser({
-          email, username, fullName, role,
-          password: await bcrypt.hash("google-" + Math.random().toString(36).slice(2), BCRYPT_ROUNDS),
-          avatarColor: randColor(),
-        });
-      }
-      res.json(sanitize(user));
-    } catch (e) {
-      res.status(400).json({ message: "Google sign-in failed" });
     }
   });
 
@@ -242,7 +217,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const quiz = await storage.getQuiz(Number(req.params.id));
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
     const existing = await storage.getSubmission(quiz.id, user.id);
-    if (existing) return res.status(409).json({ message: "You already submitted this quiz" });
+    // maxAttempts: 0 = unlimited. A teacher "reopen" deletes the prior submission,
+    // so a fresh attempt is allowed; otherwise enforce the configured limit.
+    if (existing && quiz.maxAttempts !== 0 && existing.attemptNumber >= quiz.maxAttempts)
+      return res.status(409).json({ message: "You have used all attempts for this quiz" });
+    const attemptNumber = existing ? existing.attemptNumber + 1 : 1;
+    const autoSubmitted = req.body.autoSubmitted ? 1 : 0;
 
     const answers = req.body.answers as Record<string, { answer: string | number }>;
     const questions: Question[] = JSON.parse(quiz.questions);
@@ -284,9 +264,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (a && String(a.answer ?? "").trim()) needsGrading = 1;
       }
     }
+    // If a prior attempt exists (e.g. teacher reopened with higher maxAttempts),
+    // replace it so the latest attempt is the one of record.
+    if (existing) await storage.deleteSubmission(existing.id);
     const sub = await storage.createSubmission({
       quizId: quiz.id, studentId: user.id, answers: JSON.stringify(answers),
-      score, maxScore, needsGrading, submittedAt: Date.now(),
+      score, maxScore, needsGrading, autoSubmitted, attemptNumber, submittedAt: Date.now(),
     });
     res.json(sub);
   });
@@ -405,6 +388,144 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/teacher/groups-simple", requireUser, requireTeacher, async (req, res) => {
     const user = (req as any).user as User;
     res.json(await storage.getGroupsByTeacher(user.id));
+  });
+
+  // Teacher reopens / resets a student's attempt by removing the submission so
+  // the student can take the quiz again (works during or after a quiz).
+  app.delete("/api/submissions/:id", requireUser, requireTeacher, async (req, res) => {
+    const sub = await storage.getSubmissionById(Number(req.params.id));
+    if (!sub) return res.status(404).json({ message: "Submission not found" });
+    await storage.deleteSubmission(sub.id);
+    res.json({ ok: true });
+  });
+
+  // ---------------- Feedback / suggestions ----------------
+  // Stores feedback in the DB AND, if FEEDBACK_FORM_ENDPOINT is set (e.g. a
+  // Formspree URL), forwards it by email to the site owner. Public route.
+  app.post("/api/feedback", async (req, res) => {
+    try {
+      const data = insertFeedbackSchema.parse(req.body);
+      const saved = await storage.createFeedback(data);
+      const endpoint = process.env.FEEDBACK_FORM_ENDPOINT;
+      if (endpoint) {
+        try {
+          await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              name: data.name || "Anonymous",
+              email: data.email || "(not provided)",
+              category: data.category,
+              message: data.message,
+              _subject: `math.az feedback: ${data.category}`,
+            }),
+          });
+        } catch {
+          // Email forwarding is best-effort; the feedback is already stored.
+        }
+      }
+      res.json({ ok: true, id: saved.id });
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Teacher can review all submitted feedback in-app.
+  app.get("/api/feedback", requireUser, requireTeacher, async (_req, res) => {
+    res.json(await storage.getAllFeedback());
+  });
+
+  // ---------------- Materials library ----------------
+  // Teachers build a nested folder/file tree of learning materials (PDF, video,
+  // image, audio, YouTube/links, or any uploaded file as a base64 data URI).
+  // Each file is public (all of the teacher's students) or private (only the
+  // groups the teacher selects).
+
+  // Attach the group ids a private material is shared with.
+  const withGroupIds = async (m: any) => ({
+    ...m,
+    groupIds: (await storage.getMaterialGroups(m.id)).map((g) => g.groupId),
+  });
+
+  // GET: teacher sees their full tree; student sees only accessible items.
+  app.get("/api/materials", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    if (user.role === "teacher") {
+      const items = await storage.getMaterialsByTeacher(user.id);
+      res.json(await Promise.all(items.map(withGroupIds)));
+    } else {
+      const items = await storage.getMaterialsForStudent(user.id);
+      // Strip group sharing details for students.
+      res.json(items);
+    }
+  });
+
+  app.post("/api/materials", requireUser, requireTeacher, async (req, res) => {
+    try {
+      const user = (req as any).user as User;
+      const groupIds = Array.isArray(req.body.groupIds)
+        ? (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n))
+        : [];
+      const data = insertMaterialSchema.parse({ ...req.body, teacherId: user.id });
+      // Validate parent belongs to this teacher and is a folder.
+      if (data.parentId != null) {
+        const parent = await storage.getMaterial(data.parentId);
+        if (!parent || parent.teacherId !== user.id || parent.kind !== "folder")
+          return res.status(400).json({ message: "Invalid parent folder" });
+      }
+      // Validate the selected groups belong to this teacher.
+      if (groupIds.length) {
+        const teacherGroups = await storage.getGroupsByTeacher(user.id);
+        const owned = new Set(teacherGroups.map((g) => g.id));
+        if (!groupIds.every((g) => owned.has(g)))
+          return res.status(400).json({ message: "One or more groups are not yours" });
+      }
+      const created = await storage.createMaterial(data);
+      if (created.kind === "file" && created.visibility === "private")
+        await storage.setMaterialGroups(created.id, groupIds);
+      res.json(await withGroupIds(created));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Failed to create material" });
+    }
+  });
+
+  app.patch("/api/materials/:id", requireUser, requireTeacher, async (req, res) => {
+    try {
+      const user = (req as any).user as User;
+      const id = Number(req.params.id);
+      const existing = await storage.getMaterial(id);
+      if (!existing || existing.teacherId !== user.id)
+        return res.status(404).json({ message: "Material not found" });
+      const patch = insertMaterialSchema.partial().parse(req.body);
+      // Don't allow reassigning ownership.
+      delete (patch as any).teacherId;
+      const updated = await storage.updateMaterial(id, patch);
+      // Update group sharing if provided.
+      if (Array.isArray(req.body.groupIds)) {
+        const groupIds = (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
+        const teacherGroups = await storage.getGroupsByTeacher(user.id);
+        const owned = new Set(teacherGroups.map((g) => g.id));
+        if (!groupIds.every((g) => owned.has(g)))
+          return res.status(400).json({ message: "One or more groups are not yours" });
+        await storage.setMaterialGroups(id, groupIds);
+      }
+      res.json(await withGroupIds(updated));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Failed to update material" });
+    }
+  });
+
+  app.delete("/api/materials/:id", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const id = Number(req.params.id);
+    const existing = await storage.getMaterial(id);
+    if (!existing || existing.teacherId !== user.id)
+      return res.status(404).json({ message: "Material not found" });
+    await storage.deleteMaterial(id);
+    res.json({ ok: true });
   });
 
   return httpServer;

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard, Users, FileQuestion, Library, BarChart3,
-  Video, Trophy, LogOut, Moon, Sun, Menu, Globe,
+  Video, Trophy, LogOut, Moon, Sun, Menu, Globe, MessageSquareHeart, FolderOpen,
 } from "lucide-react";
 
 type NavItem = { href: string; key: string; icon: React.ElementType };
@@ -20,15 +20,19 @@ const TEACHER_NAV: NavItem[] = [
   { href: "/groups", key: "nav.groups", icon: Users },
   { href: "/quizzes", key: "nav.quizzes", icon: FileQuestion },
   { href: "/library", key: "nav.library", icon: Library },
+  { href: "/materials", key: "nav.materials", icon: FolderOpen },
   { href: "/analytics", key: "nav.analytics", icon: BarChart3 },
   { href: "/sessions", key: "nav.sessions", icon: Video },
+  { href: "/feedback", key: "nav.feedback", icon: MessageSquareHeart },
 ];
 
 const STUDENT_NAV: NavItem[] = [
   { href: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
   { href: "/quizzes", key: "nav.quizzes", icon: FileQuestion },
+  { href: "/materials", key: "nav.materials", icon: FolderOpen },
   { href: "/sessions", key: "nav.sessions", icon: Video },
   { href: "/results", key: "nav.results", icon: Trophy },
+  { href: "/feedback", key: "nav.feedback", icon: MessageSquareHeart },
 ];
 
 export function LanguageSwitcher() {

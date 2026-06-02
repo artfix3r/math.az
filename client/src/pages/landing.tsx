@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth, AuthUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Logo, MathBackdrop } from "@/lib/ui";
@@ -159,6 +159,11 @@ export default function Landing() {
               </p>
             )}
           </Card>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            <Link href="/feedback" data-testid="link-feedback" className="font-bold text-primary hover:underline">
+              {t("nav.feedback")}
+            </Link>
+          </p>
         </div>
       </div>
     </div>

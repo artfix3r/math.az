@@ -2,11 +2,45 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
-// Lightweight auth: sandboxed iframe blocks localStorage/cookies, so we keep
-// the logged-in user id in a module variable and attach it to every request.
+// Lightweight auth: we keep the logged-in user id in a module variable and
+// attach it to every request. We ALSO persist it (with a timestamp) in
+// localStorage so a page refresh keeps the user signed in for a limited window.
+const AUTH_KEY = "mathaz.auth";
+export const SESSION_TTL_MS = 2.5 * 60 * 60 * 1000; // 2.5 hours
+
 let currentUserId: number | null = null;
+
 export function setCurrentUserId(id: number | null) {
   currentUserId = id;
+  try {
+    if (id != null) {
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ id, ts: Date.now() }));
+    } else {
+      localStorage.removeItem(AUTH_KEY);
+    }
+  } catch {
+    // localStorage may be unavailable (e.g. sandboxed iframe preview) — auth
+    // still works in-memory for the current page load.
+  }
+}
+
+// Returns a still-valid persisted user id, or null if absent/expired.
+export function getPersistedUserId(): number | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    const { id, ts } = JSON.parse(raw) as { id: number; ts: number };
+    if (typeof id !== "number" || typeof ts !== "number") return null;
+    if (Date.now() - ts > SESSION_TTL_MS) {
+      localStorage.removeItem(AUTH_KEY);
+      return null;
+    }
+    // Re-arm the in-memory id so API calls during rehydration are authenticated.
+    currentUserId = id;
+    return id;
+  } catch {
+    return null;
+  }
 }
 function authHeaders(base: Record<string, string> = {}): Record<string, string> {
   if (currentUserId != null) base["x-user-id"] = String(currentUserId);

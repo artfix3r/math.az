@@ -74,6 +74,7 @@ export const quizzes = sqliteTable("quizzes", {
   groupId: integer("group_id"), // null when it's a template/library item
   questions: text("questions").notNull().default("[]"),
   durationMinutes: integer("duration_minutes").notNull().default(30),
+  maxAttempts: integer("max_attempts").notNull().default(1), // 0 = unlimited
   startAt: integer("start_at"), // epoch ms; null for templates
   isTemplate: integer("is_template").notNull().default(0), // 1 = library/backup item
   createdAt: integer("created_at").notNull(),
@@ -124,6 +125,9 @@ export const submissions = sqliteTable("submissions", {
   needsGrading: integer("needs_grading").notNull().default(0),
   // JSON map of questionId -> awarded points, saved when a teacher grades. "{}" until graded.
   gradedPoints: text("graded_points").notNull().default("{}"),
+  // 1 if the quiz was auto-submitted (e.g. student switched tabs). Shown to teacher.
+  autoSubmitted: integer("auto_submitted").notNull().default(0),
+  attemptNumber: integer("attempt_number").notNull().default(1),
   submittedAt: integer("submitted_at").notNull(),
 });
 
@@ -152,3 +156,74 @@ export const insertSessionSchema = createInsertSchema(sessions)
 
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type ClassSession = typeof sessions.$inferSelect;
+
+// ---------------- Feedback / suggestions ----------------
+export const feedback = sqliteTable("feedback", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().default(""),
+  email: text("email").notNull().default(""),
+  category: text("category").notNull().default("suggestion"), // suggestion | bug | other
+  message: text("message").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedback)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    message: z.string().min(1),
+    email: z.string().email().or(z.literal("")),
+  });
+
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedback.$inferSelect;
+
+// ---------------- Materials (folders + files) ----------------
+// A single tree of nodes. kind: "folder" | "file".
+// - Folders organize files; parentId points to the parent folder (null = root).
+// - Files carry content: either an uploaded payload (dataUrl, base64 data URI stored
+//   in the DB) OR an external link (linkUrl) for YouTube / web links.
+// fileType: "pdf" | "video" | "image" | "audio" | "youtube" | "link" | "other"
+// visibility: "public" (all of the teacher's students) | "private" (only selected groups).
+// Folders inherit nothing — visibility is per file. Folders are always visible to the
+// teacher; students only ever see files they are allowed to access (filtered server-side).
+export const materials = sqliteTable("materials", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teacherId: integer("teacher_id").notNull(),
+  kind: text("kind").notNull().default("file"), // "folder" | "file"
+  name: text("name").notNull(),
+  parentId: integer("parent_id"), // null = root level
+  fileType: text("file_type").notNull().default("other"), // for files only
+  // For uploaded files: a base64 data URI (data:<mime>;base64,....). Empty for folders/links.
+  dataUrl: text("data_url").notNull().default(""),
+  // For YouTube / external links. Empty for folders / uploaded files.
+  linkUrl: text("link_url").notNull().default(""),
+  // Original size in bytes (uploaded files) for display. 0 for folders/links.
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  visibility: text("visibility").notNull().default("public"), // "public" | "private"
+  createdAt: integer("created_at").notNull(),
+});
+
+export const insertMaterialSchema = createInsertSchema(materials)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    name: z.string().min(1),
+    kind: z.enum(["folder", "file"]).default("file"),
+    fileType: z
+      .enum(["pdf", "video", "image", "audio", "youtube", "link", "other"])
+      .default("other"),
+    visibility: z.enum(["public", "private"]).default("public"),
+    parentId: z.number().nullable().optional(),
+  });
+
+export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
+export type Material = typeof materials.$inferSelect;
+
+// Junction: a private material is shared with one or more groups.
+export const materialGroups = sqliteTable("material_groups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  materialId: integer("material_id").notNull(),
+  groupId: integer("group_id").notNull(),
+});
+
+export const insertMaterialGroupSchema = createInsertSchema(materialGroups).omit({ id: true });
+export type MaterialGroup = typeof materialGroups.$inferSelect;
