@@ -22,7 +22,7 @@ import {
 import {
   FolderPlus, FilePlus, Folder, ChevronRight, FileText, Film, Image as ImageIcon,
   Music, Youtube, Link as LinkIcon, File as FileIcon, Trash2, Download,
-  ExternalLink, FolderOpen,
+  ExternalLink, FolderOpen, Pencil,
 } from "lucide-react";
 import type { Group } from "@shared/schema";
 
@@ -186,6 +186,7 @@ function MaterialCard({
   const { t } = useT();
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const Icon = iconFor(m);
 
   const del = useMutation({
@@ -252,7 +253,17 @@ function MaterialCard({
             <Button
               variant="ghost"
               size="icon"
-              className="ml-auto text-muted-foreground hover:text-destructive"
+              className="ml-auto text-muted-foreground hover:text-primary"
+              onClick={() => setEditOpen(true)}
+              data-testid={`button-edit-${m.id}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <EditMaterialDialog m={m} open={editOpen} onOpenChange={setEditOpen} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmOpen(true)}
               data-testid={`button-delete-${m.id}`}
             >
@@ -532,6 +543,183 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
             data-testid="button-material-create"
           >
             {t("mat.create")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditMaterialDialog({
+  m, open, onOpenChange,
+}: {
+  m: Material; open: boolean; onOpenChange: (o: boolean) => void;
+}) {
+  const { t } = useT();
+  const { toast } = useToast();
+  const isFolder = m.kind === "folder";
+  const isLink = m.fileType === "youtube" || m.fileType === "link";
+
+  const [name, setName] = useState(m.name);
+  const [url, setUrl] = useState(m.linkUrl);
+  const [visibility, setVisibility] = useState<"public" | "private">(m.visibility);
+  const [groupIds, setGroupIds] = useState<number[]>(m.groupIds ?? []);
+  // Optional file replacement (uploads only)
+  const [newDataUrl, setNewDataUrl] = useState("");
+  const [newFileType, setNewFileType] = useState<Material["fileType"]>(m.fileType);
+  const [newSizeBytes, setNewSizeBytes] = useState(0);
+  const [newFileName, setNewFileName] = useState("");
+
+  const { data: groups } = useQuery<Group[]>({ queryKey: ["/api/teacher/groups-simple"], enabled: open && !isFolder });
+
+  // Re-seed local state whenever the dialog (re)opens for this material.
+  function syncFromProps() {
+    setName(m.name);
+    setUrl(m.linkUrl);
+    setVisibility(m.visibility);
+    setGroupIds(m.groupIds ?? []);
+    setNewDataUrl(""); setNewFileType(m.fileType); setNewSizeBytes(0); setNewFileName("");
+  }
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > MAX_BYTES) {
+      toast({ title: t("mat.tooBig"), variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewDataUrl(String(reader.result || ""));
+      setNewFileType(fileTypeFromMime(f.type));
+      setNewSizeBytes(f.size);
+      setNewFileName(f.name);
+    };
+    reader.onerror = () => toast({ title: t("mat.uploadFailed"), variant: "destructive" });
+    reader.readAsDataURL(f);
+  }
+
+  function toggleGroup(id: number) {
+    setGroupIds((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, unknown> = { name: name.trim() };
+      if (!isFolder) {
+        payload.visibility = visibility;
+        payload.groupIds = visibility === "private" ? groupIds : [];
+        if (isLink) {
+          payload.linkUrl = url.trim();
+        } else if (newDataUrl) {
+          // Teacher chose to replace the underlying file.
+          payload.dataUrl = newDataUrl;
+          payload.fileType = newFileType;
+          payload.sizeBytes = newSizeBytes;
+        }
+      }
+      return (await apiRequest("PATCH", `/api/materials/${m.id}`, payload)).json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      onOpenChange(false);
+      toast({ title: t("mat.saved") });
+    },
+  });
+
+  const valid =
+    !!name.trim() &&
+    (isFolder || !isLink || !!url.trim()) &&
+    (isFolder || visibility === "public" || groupIds.length > 0);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (o) syncFromProps(); onOpenChange(o); }}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isFolder ? t("mat.editFolder") : t("mat.editMaterial")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Name */}
+          <div className="space-y-1.5">
+            <Label className="font-bold">{isFolder ? t("mat.folderName") : t("mat.displayName")}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              data-testid="input-edit-name"
+              autoFocus
+            />
+          </div>
+
+          {!isFolder && isLink && (
+            <div className="space-y-1.5">
+              <Label className="font-bold">{m.fileType === "youtube" ? t("mat.youtubeUrl") : t("mat.url")}</Label>
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} data-testid="input-edit-url" />
+            </div>
+          )}
+
+          {!isFolder && !isLink && (
+            <div className="space-y-1.5">
+              <Label className="font-bold">{t("mat.replaceFile")}</Label>
+              <Input type="file" onChange={onFile} data-testid="input-edit-file" />
+              {newFileName
+                ? <p className="text-xs text-muted-foreground" data-testid="text-edit-file-chosen">{t("mat.fileChosen", { name: newFileName })}</p>
+                : <p className="text-xs text-muted-foreground">{t("mat.keepFile")}</p>}
+            </div>
+          )}
+
+          {/* Visibility (files only) */}
+          {!isFolder && (
+            <>
+              <div className="space-y-2">
+                <Label className="font-bold">{t("mat.visibility")}</Label>
+                <RadioGroup value={visibility} onValueChange={(v) => setVisibility(v as "public" | "private")}>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="public" id={`evis-public-${m.id}`} data-testid="edit-visibility-public" />
+                    <Label htmlFor={`evis-public-${m.id}`} className="font-normal">{t("mat.public")}</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="private" id={`evis-private-${m.id}`} data-testid="edit-visibility-private" />
+                    <Label htmlFor={`evis-private-${m.id}`} className="font-normal">{t("mat.private")}</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {visibility === "private" && (
+                <div className="space-y-2 rounded-xl border bg-muted/40 p-3">
+                  <Label className="font-bold">{t("mat.pickGroups")}</Label>
+                  {groups && groups.length > 0 ? (
+                    <div className="space-y-2">
+                      {groups.map((g) => (
+                        <div key={g.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`egrp-${m.id}-${g.id}`}
+                            checked={groupIds.includes(g.id)}
+                            onCheckedChange={() => toggleGroup(g.id)}
+                            data-testid={`edit-group-checkbox-${g.id}`}
+                          />
+                          <Label htmlFor={`egrp-${m.id}-${g.id}`} className="font-normal">{g.name}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{t("mat.noGroups")}</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-edit-cancel">{t("mat.cancel")}</Button>
+          <Button
+            className="font-bold"
+            disabled={!valid || save.isPending}
+            onClick={() => save.mutate()}
+            data-testid="button-edit-save"
+          >
+            {t("mat.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

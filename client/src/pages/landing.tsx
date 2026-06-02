@@ -134,13 +134,13 @@ export default function Landing() {
                 <form onSubmit={handleRegister} className="space-y-3">
                   <RolePicker role={role} setRole={setRole} />
                   <Field label={t("landing.fullName")}>
-                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ada Lovelace" data-testid="input-fullname" required />
+                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("landing.fullNamePlaceholder")} data-testid="input-fullname" required />
                   </Field>
                   <Field label={t("landing.email")}>
                     <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" data-testid="input-email" required />
                   </Field>
                   <Field label={t("landing.username")}>
-                    <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ada" data-testid="input-username" required />
+                    <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("landing.usernamePlaceholder")} data-testid="input-username" required />
                   </Field>
                   <Field label={t("landing.password")}>
                     <Input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} data-testid="input-regpassword" required />
