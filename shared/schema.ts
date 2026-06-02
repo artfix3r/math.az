@@ -1,11 +1,15 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, serial, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Epoch-millisecond timestamps exceed PG 32-bit integer range, so they must be
+// bigint columns. mode:"number" keeps them as JS numbers (matching Date.now()).
+const ts = (name: string) => bigint(name, { mode: "number" });
+
 // ---------------- Users ----------------
 // role: "teacher" | "student"
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
@@ -36,13 +40,13 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // ---------------- Groups ----------------
-export const groups = sqliteTable("groups", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const groups = pgTable("groups", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   color: text("color").notNull().default("violet"),
   teacherId: integer("teacher_id").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export const insertGroupSchema = createInsertSchema(groups)
@@ -53,8 +57,8 @@ export type InsertGroup = z.infer<typeof insertGroupSchema>;
 export type Group = typeof groups.$inferSelect;
 
 // ---------------- Group members ----------------
-export const groupMembers = sqliteTable("group_members", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const groupMembers = pgTable("group_members", {
+  id: serial("id").primaryKey(),
   groupId: integer("group_id").notNull(),
   studentId: integer("student_id").notNull(),
 });
@@ -66,8 +70,8 @@ export type GroupMember = typeof groupMembers.$inferSelect;
 // questions stored as JSON text. Each question:
 // { id, type: "mcq"|"open"|"photo", prompt, imageUrl?, options?: string[], correctIndex?, points }
 // status: "draft" | "scheduled" | "template"
-export const quizzes = sqliteTable("quizzes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const quizzes = pgTable("quizzes", {
+  id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   teacherId: integer("teacher_id").notNull(),
@@ -75,9 +79,9 @@ export const quizzes = sqliteTable("quizzes", {
   questions: text("questions").notNull().default("[]"),
   durationMinutes: integer("duration_minutes").notNull().default(30),
   maxAttempts: integer("max_attempts").notNull().default(1), // 0 = unlimited
-  startAt: integer("start_at"), // epoch ms; null for templates
+  startAt: ts("start_at"), // epoch ms; null for templates
   isTemplate: integer("is_template").notNull().default(0), // 1 = library/backup item
-  createdAt: integer("created_at").notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export const questionSchema = z.object({
@@ -115,8 +119,8 @@ export type Quiz = typeof quizzes.$inferSelect;
 
 // ---------------- Quiz submissions ----------------
 // answers: JSON text -> { [questionId]: { answer: string|number, awardedPoints?: number } }
-export const submissions = sqliteTable("submissions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const submissions = pgTable("submissions", {
+  id: serial("id").primaryKey(),
   quizId: integer("quiz_id").notNull(),
   studentId: integer("student_id").notNull(),
   answers: text("answers").notNull().default("{}"),
@@ -128,7 +132,7 @@ export const submissions = sqliteTable("submissions", {
   // 1 if the quiz was auto-submitted (e.g. student switched tabs). Shown to teacher.
   autoSubmitted: integer("auto_submitted").notNull().default(0),
   attemptNumber: integer("attempt_number").notNull().default(1),
-  submittedAt: integer("submitted_at").notNull(),
+  submittedAt: ts("submitted_at").notNull(),
 });
 
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true });
@@ -136,15 +140,15 @@ export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 export type Submission = typeof submissions.$inferSelect;
 
 // ---------------- Online sessions ----------------
-export const sessions = sqliteTable("sessions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const sessions = pgTable("sessions", {
+  id: serial("id").primaryKey(),
   title: text("title").notNull(),
   teacherId: integer("teacher_id").notNull(),
   groupId: integer("group_id"),
   meetingUrl: text("meeting_url").notNull(),
-  startAt: integer("start_at").notNull(),
+  startAt: ts("start_at").notNull(),
   durationMinutes: integer("duration_minutes").notNull().default(60),
-  createdAt: integer("created_at").notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export const insertSessionSchema = createInsertSchema(sessions)
@@ -158,13 +162,13 @@ export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type ClassSession = typeof sessions.$inferSelect;
 
 // ---------------- Feedback / suggestions ----------------
-export const feedback = sqliteTable("feedback", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull().default(""),
   email: text("email").notNull().default(""),
   category: text("category").notNull().default("suggestion"), // suggestion | bug | other
   message: text("message").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export const insertFeedbackSchema = createInsertSchema(feedback)
@@ -186,8 +190,8 @@ export type Feedback = typeof feedback.$inferSelect;
 // visibility: "public" (all of the teacher's students) | "private" (only selected groups).
 // Folders inherit nothing — visibility is per file. Folders are always visible to the
 // teacher; students only ever see files they are allowed to access (filtered server-side).
-export const materials = sqliteTable("materials", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const materials = pgTable("materials", {
+  id: serial("id").primaryKey(),
   teacherId: integer("teacher_id").notNull(),
   kind: text("kind").notNull().default("file"), // "folder" | "file"
   name: text("name").notNull(),
@@ -200,7 +204,7 @@ export const materials = sqliteTable("materials", {
   // Original size in bytes (uploaded files) for display. 0 for folders/links.
   sizeBytes: integer("size_bytes").notNull().default(0),
   visibility: text("visibility").notNull().default("public"), // "public" | "private"
-  createdAt: integer("created_at").notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export const insertMaterialSchema = createInsertSchema(materials)
@@ -219,8 +223,8 @@ export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type Material = typeof materials.$inferSelect;
 
 // Junction: a private material is shared with one or more groups.
-export const materialGroups = sqliteTable("material_groups", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const materialGroups = pgTable("material_groups", {
+  id: serial("id").primaryKey(),
   materialId: integer("material_id").notNull(),
   groupId: integer("group_id").notNull(),
 });

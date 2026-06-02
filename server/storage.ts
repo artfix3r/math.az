@@ -8,19 +8,23 @@ import type {
   ClassSession, InsertSession, Feedback, InsertFeedback,
   Material, InsertMaterial, MaterialGroup,
 } from "@shared/schema";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { eq, and, inArray } from "drizzle-orm";
 
-// DB path is configurable so production hosts (e.g. Render) can point it at a
-// persistent mounted disk via DATABASE_PATH. Defaults to a local file otherwise.
-const sqlite = new Database(process.env.DATABASE_PATH || "data.db");
-sqlite.pragma("journal_mode = WAL");
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) throw new Error("DATABASE_URL is required");
 
-// Create tables if they don't exist (template ships no migration runner).
-sqlite.exec(`
+// disable prepared statements — safe for pgbouncer / Vercel serverless
+const client = postgres(connectionString, { prepare: false });
+export const db = drizzle(client);
+
+// Auto-create tables on first startup. Exported as a promise so server/index.ts
+// can await it before listening, and api/index.ts can await it per-request.
+export const ready = (async () => {
+  await client.unsafe(`
 CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   username TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
@@ -29,20 +33,20 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_color TEXT NOT NULL DEFAULT 'violet'
 );
 CREATE TABLE IF NOT EXISTS groups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   color TEXT NOT NULL DEFAULT 'violet',
   teacher_id INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS group_members (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   group_id INTEGER NOT NULL,
   student_id INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS quizzes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   teacher_id INTEGER NOT NULL,
@@ -50,12 +54,12 @@ CREATE TABLE IF NOT EXISTS quizzes (
   questions TEXT NOT NULL DEFAULT '[]',
   duration_minutes INTEGER NOT NULL DEFAULT 30,
   max_attempts INTEGER NOT NULL DEFAULT 1,
-  start_at INTEGER,
+  start_at BIGINT,
   is_template INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS submissions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   quiz_id INTEGER NOT NULL,
   student_id INTEGER NOT NULL,
   answers TEXT NOT NULL DEFAULT '{}',
@@ -65,28 +69,28 @@ CREATE TABLE IF NOT EXISTS submissions (
   graded_points TEXT NOT NULL DEFAULT '{}',
   auto_submitted INTEGER NOT NULL DEFAULT 0,
   attempt_number INTEGER NOT NULL DEFAULT 1,
-  submitted_at INTEGER NOT NULL
+  submitted_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   teacher_id INTEGER NOT NULL,
   group_id INTEGER,
   meeting_url TEXT NOT NULL,
-  start_at INTEGER NOT NULL,
+  start_at BIGINT NOT NULL,
   duration_minutes INTEGER NOT NULL DEFAULT 60,
-  created_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS feedback (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   name TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL DEFAULT '',
   category TEXT NOT NULL DEFAULT 'suggestion',
   message TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS materials (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   teacher_id INTEGER NOT NULL,
   kind TEXT NOT NULL DEFAULT 'file',
   name TEXT NOT NULL,
@@ -96,28 +100,18 @@ CREATE TABLE IF NOT EXISTS materials (
   link_url TEXT NOT NULL DEFAULT '',
   size_bytes INTEGER NOT NULL DEFAULT 0,
   visibility TEXT NOT NULL DEFAULT 'public',
-  created_at INTEGER NOT NULL
+  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS material_groups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   material_id INTEGER NOT NULL,
   group_id INTEGER NOT NULL
 );
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS auto_submitted INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS attempt_number INTEGER NOT NULL DEFAULT 1;
 `);
-
-// Idempotent migrations for databases created before these columns existed.
-// SQLite has no "ADD COLUMN IF NOT EXISTS", so we check the table info first.
-function ensureColumn(table: string, column: string, ddl: string) {
-  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === column)) {
-    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
-  }
-}
-ensureColumn("quizzes", "max_attempts", "max_attempts INTEGER NOT NULL DEFAULT 1");
-ensureColumn("submissions", "auto_submitted", "auto_submitted INTEGER NOT NULL DEFAULT 0");
-ensureColumn("submissions", "attempt_number", "attempt_number INTEGER NOT NULL DEFAULT 1");
-
-export const db = drizzle(sqlite);
+})();
 
 export interface IStorage {
   // users
@@ -175,186 +169,202 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // ---- users ----
   async getUser(id: number) {
-    return db.select().from(users).where(eq(users.id, id)).get();
+    const rows = await db.select().from(users).where(eq(users.id, id));
+    return rows[0];
   }
   async getUserByUsername(username: string) {
-    return db.select().from(users).where(eq(users.username, username)).get();
+    const rows = await db.select().from(users).where(eq(users.username, username));
+    return rows[0];
   }
   async getUserByEmail(email: string) {
-    return db.select().from(users).where(eq(users.email, email)).get();
+    const rows = await db.select().from(users).where(eq(users.email, email));
+    return rows[0];
   }
   async getUsersByIds(ids: number[]) {
     if (ids.length === 0) return [];
-    return db.select().from(users).where(inArray(users.id, ids)).all();
+    return db.select().from(users).where(inArray(users.id, ids));
   }
   async createUser(insertUser: InsertUser) {
-    return db.insert(users).values(insertUser).returning().get();
+    const rows = await db.insert(users).values(insertUser).returning();
+    return rows[0];
   }
 
   // ---- groups ----
   async createGroup(g: InsertGroup) {
-    return db.insert(groups).values({ ...g, createdAt: Date.now() }).returning().get();
+    const rows = await db.insert(groups).values({ ...g, createdAt: Date.now() }).returning();
+    return rows[0];
   }
   async getGroupsByTeacher(teacherId: number) {
-    return db.select().from(groups).where(eq(groups.teacherId, teacherId)).all();
+    return db.select().from(groups).where(eq(groups.teacherId, teacherId));
   }
   async getGroupsByStudent(studentId: number) {
-    const memberships = db.select().from(groupMembers)
-      .where(eq(groupMembers.studentId, studentId)).all();
+    const memberships = await db.select().from(groupMembers)
+      .where(eq(groupMembers.studentId, studentId));
     const gids = memberships.map((m) => m.groupId);
     if (gids.length === 0) return [];
-    return db.select().from(groups).where(inArray(groups.id, gids)).all();
+    return db.select().from(groups).where(inArray(groups.id, gids));
   }
   async getGroup(id: number) {
-    return db.select().from(groups).where(eq(groups.id, id)).get();
+    const rows = await db.select().from(groups).where(eq(groups.id, id));
+    return rows[0];
   }
   async deleteGroup(id: number) {
-    db.delete(groupMembers).where(eq(groupMembers.groupId, id)).run();
-    db.delete(groups).where(eq(groups.id, id)).run();
+    await db.delete(groupMembers).where(eq(groupMembers.groupId, id));
+    await db.delete(groups).where(eq(groups.id, id));
   }
 
   // ---- members ----
   async addMember(groupId: number, studentId: number) {
-    return db.insert(groupMembers).values({ groupId, studentId }).returning().get();
+    const rows = await db.insert(groupMembers).values({ groupId, studentId }).returning();
+    return rows[0];
   }
   async removeMember(groupId: number, studentId: number) {
-    db.delete(groupMembers)
-      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.studentId, studentId)))
-      .run();
+    await db.delete(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.studentId, studentId)));
   }
   async getMembers(groupId: number) {
-    const ms = db.select().from(groupMembers).where(eq(groupMembers.groupId, groupId)).all();
+    const ms = await db.select().from(groupMembers).where(eq(groupMembers.groupId, groupId));
     return this.getUsersByIds(ms.map((m) => m.studentId));
   }
   async isMember(groupId: number, studentId: number) {
-    const row = db.select().from(groupMembers)
-      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.studentId, studentId)))
-      .get();
-    return !!row;
+    const rows = await db.select().from(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.studentId, studentId)));
+    return rows.length > 0;
   }
 
   // ---- quizzes ----
   async createQuiz(q: InsertQuiz) {
-    return db.insert(quizzes).values({ ...q, createdAt: Date.now() }).returning().get();
+    const rows = await db.insert(quizzes).values({ ...q, createdAt: Date.now() }).returning();
+    return rows[0];
   }
   async updateQuiz(id: number, q: Partial<InsertQuiz>) {
-    return db.update(quizzes).set(q).where(eq(quizzes.id, id)).returning().get();
+    const rows = await db.update(quizzes).set(q).where(eq(quizzes.id, id)).returning();
+    return rows[0];
   }
   async getQuiz(id: number) {
-    return db.select().from(quizzes).where(eq(quizzes.id, id)).get();
+    const rows = await db.select().from(quizzes).where(eq(quizzes.id, id));
+    return rows[0];
   }
   async getQuizzesByTeacher(teacherId: number) {
     return db.select().from(quizzes)
-      .where(and(eq(quizzes.teacherId, teacherId), eq(quizzes.isTemplate, 0))).all();
+      .where(and(eq(quizzes.teacherId, teacherId), eq(quizzes.isTemplate, 0)));
   }
   async getTemplatesByTeacher(teacherId: number) {
     return db.select().from(quizzes)
-      .where(and(eq(quizzes.teacherId, teacherId), eq(quizzes.isTemplate, 1))).all();
+      .where(and(eq(quizzes.teacherId, teacherId), eq(quizzes.isTemplate, 1)));
   }
   async getQuizzesForStudent(studentId: number) {
-    const memberships = db.select().from(groupMembers)
-      .where(eq(groupMembers.studentId, studentId)).all();
+    const memberships = await db.select().from(groupMembers)
+      .where(eq(groupMembers.studentId, studentId));
     const gids = memberships.map((m) => m.groupId);
     if (gids.length === 0) return [];
     return db.select().from(quizzes)
-      .where(and(inArray(quizzes.groupId, gids), eq(quizzes.isTemplate, 0))).all();
+      .where(and(inArray(quizzes.groupId, gids), eq(quizzes.isTemplate, 0)));
   }
   async deleteQuiz(id: number) {
-    db.delete(quizzes).where(eq(quizzes.id, id)).run();
+    await db.delete(quizzes).where(eq(quizzes.id, id));
   }
 
   // ---- submissions ----
   async createSubmission(s: InsertSubmission) {
-    return db.insert(submissions).values(s).returning().get();
+    const rows = await db.insert(submissions).values(s).returning();
+    return rows[0];
   }
   async updateSubmission(id: number, s: Partial<Submission>) {
-    return db.update(submissions).set(s).where(eq(submissions.id, id)).returning().get();
+    const rows = await db.update(submissions).set(s).where(eq(submissions.id, id)).returning();
+    return rows[0];
   }
   async getSubmissionsByQuiz(quizId: number) {
-    return db.select().from(submissions).where(eq(submissions.quizId, quizId)).all();
+    return db.select().from(submissions).where(eq(submissions.quizId, quizId));
   }
   async getSubmissionsByStudent(studentId: number) {
-    return db.select().from(submissions).where(eq(submissions.studentId, studentId)).all();
+    return db.select().from(submissions).where(eq(submissions.studentId, studentId));
   }
   async getSubmission(quizId: number, studentId: number) {
-    return db.select().from(submissions)
-      .where(and(eq(submissions.quizId, quizId), eq(submissions.studentId, studentId)))
-      .get();
+    const rows = await db.select().from(submissions)
+      .where(and(eq(submissions.quizId, quizId), eq(submissions.studentId, studentId)));
+    return rows[0];
   }
   async getSubmissionById(id: number) {
-    return db.select().from(submissions).where(eq(submissions.id, id)).get();
+    const rows = await db.select().from(submissions).where(eq(submissions.id, id));
+    return rows[0];
   }
   async deleteSubmission(id: number) {
-    db.delete(submissions).where(eq(submissions.id, id)).run();
+    await db.delete(submissions).where(eq(submissions.id, id));
   }
 
   // ---- feedback ----
   async createFeedback(f: InsertFeedback) {
-    return db.insert(feedback).values({ ...f, createdAt: Date.now() }).returning().get();
+    const rows = await db.insert(feedback).values({ ...f, createdAt: Date.now() }).returning();
+    return rows[0];
   }
   async getAllFeedback() {
-    return db.select().from(feedback).all();
+    return db.select().from(feedback);
   }
 
   // ---- sessions ----
   async createSession(s: InsertSession) {
-    return db.insert(sessions).values({ ...s, createdAt: Date.now() }).returning().get();
+    const rows = await db.insert(sessions).values({ ...s, createdAt: Date.now() }).returning();
+    return rows[0];
   }
   async getSessionsByTeacher(teacherId: number) {
-    return db.select().from(sessions).where(eq(sessions.teacherId, teacherId)).all();
+    return db.select().from(sessions).where(eq(sessions.teacherId, teacherId));
   }
   async getSessionsForStudent(studentId: number) {
-    const memberships = db.select().from(groupMembers)
-      .where(eq(groupMembers.studentId, studentId)).all();
+    const memberships = await db.select().from(groupMembers)
+      .where(eq(groupMembers.studentId, studentId));
     const gids = memberships.map((m) => m.groupId);
     if (gids.length === 0) return [];
     // teachers of the student's groups
-    const myGroups = db.select().from(groups).where(inArray(groups.id, gids)).all();
+    const myGroups = await db.select().from(groups).where(inArray(groups.id, gids));
     const teacherIds = Array.from(new Set(myGroups.map((g) => g.teacherId)));
-    const all = db.select().from(sessions).all();
+    const all = await db.select().from(sessions);
     return all.filter(
       (s) => (s.groupId != null && gids.includes(s.groupId)) ||
              (s.groupId == null && teacherIds.includes(s.teacherId)),
     );
   }
   async deleteSession(id: number) {
-    db.delete(sessions).where(eq(sessions.id, id)).run();
+    await db.delete(sessions).where(eq(sessions.id, id));
   }
 
   // ---- materials ----
   async createMaterial(m: InsertMaterial) {
-    return db.insert(materials).values({
+    const rows = await db.insert(materials).values({
       ...m,
       parentId: m.parentId ?? null,
       createdAt: Date.now(),
-    }).returning().get();
+    }).returning();
+    return rows[0];
   }
   async updateMaterial(id: number, m: Partial<InsertMaterial>) {
-    return db.update(materials).set(m).where(eq(materials.id, id)).returning().get();
+    const rows = await db.update(materials).set(m).where(eq(materials.id, id)).returning();
+    return rows[0];
   }
   async getMaterial(id: number) {
-    return db.select().from(materials).where(eq(materials.id, id)).get();
+    const rows = await db.select().from(materials).where(eq(materials.id, id));
+    return rows[0];
   }
   async getMaterialsByTeacher(teacherId: number) {
-    return db.select().from(materials).where(eq(materials.teacherId, teacherId)).all();
+    return db.select().from(materials).where(eq(materials.teacherId, teacherId));
   }
   async getMaterialsForStudent(studentId: number) {
     // Student's groups
-    const memberships = db.select().from(groupMembers)
-      .where(eq(groupMembers.studentId, studentId)).all();
+    const memberships = await db.select().from(groupMembers)
+      .where(eq(groupMembers.studentId, studentId));
     const gids = memberships.map((m) => m.groupId);
     // Teachers of the student's groups — student can see those teachers' public materials.
     const myGroups = gids.length
-      ? db.select().from(groups).where(inArray(groups.id, gids)).all()
+      ? await db.select().from(groups).where(inArray(groups.id, gids))
       : [];
     const teacherIds = Array.from(new Set(myGroups.map((g) => g.teacherId)));
     if (teacherIds.length === 0) return [];
     // All file materials belonging to those teachers (folders are reconstructed client-side
     // from parentId chains of the accessible files).
-    const all = db.select().from(materials)
-      .where(inArray(materials.teacherId, teacherIds)).all();
+    const all = await db.select().from(materials)
+      .where(inArray(materials.teacherId, teacherIds));
     // Private material -> group ids it is shared with.
-    const mgRows = db.select().from(materialGroups).all();
+    const mgRows = await db.select().from(materialGroups);
     const sharedByMaterial = new Map<number, number[]>();
     for (const r of mgRows) {
       const arr = sharedByMaterial.get(r.materialId) || [];
@@ -371,7 +381,7 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteMaterial(id: number) {
     // Cascade: delete this node, all descendant nodes (recursively), and their group links.
-    const all = db.select().from(materials).all();
+    const all = await db.select().from(materials);
     const toDelete = new Set<number>([id]);
     let grew = true;
     while (grew) {
@@ -384,18 +394,18 @@ export class DatabaseStorage implements IStorage {
       }
     }
     const ids = Array.from(toDelete);
-    db.delete(materialGroups).where(inArray(materialGroups.materialId, ids)).run();
-    db.delete(materials).where(inArray(materials.id, ids)).run();
+    await db.delete(materialGroups).where(inArray(materialGroups.materialId, ids));
+    await db.delete(materials).where(inArray(materials.id, ids));
   }
   async setMaterialGroups(materialId: number, groupIds: number[]) {
-    db.delete(materialGroups).where(eq(materialGroups.materialId, materialId)).run();
+    await db.delete(materialGroups).where(eq(materialGroups.materialId, materialId));
     for (const groupId of groupIds) {
-      db.insert(materialGroups).values({ materialId, groupId }).run();
+      await db.insert(materialGroups).values({ materialId, groupId });
     }
   }
   async getMaterialGroups(materialId: number) {
     return db.select().from(materialGroups)
-      .where(eq(materialGroups.materialId, materialId)).all();
+      .where(eq(materialGroups.materialId, materialId));
   }
 }
 
