@@ -58,6 +58,25 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Bundle the Vercel serverless handler. esbuild resolves the @shared/@ path
+  // aliases and inlines the allowlisted deps, producing a self-contained CJS
+  // file that Vercel's @vercel/node builder can wrap without needing to know
+  // about tsconfig path aliases or our esbuild allowlist.
+  console.log("building vercel serverless function...");
+  await esbuild({
+    entryPoints: ["api/index.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "api/index.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {
