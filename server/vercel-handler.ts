@@ -1,4 +1,4 @@
-import { app, ready } from "../server/index";
+import { app, ready } from "./index";
 
 // Vercel serverless entry. `ready` resolves once the DB schema is ensured and
 // all Express routes + the error handler are registered, so every cold start

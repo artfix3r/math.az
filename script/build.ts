@@ -65,7 +65,7 @@ async function buildAll() {
   // about tsconfig path aliases or our esbuild allowlist.
   console.log("building vercel serverless function...");
   await esbuild({
-    entryPoints: ["api/index.ts"],
+    entryPoints: ["server/vercel-handler.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
