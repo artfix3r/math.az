@@ -19,9 +19,21 @@ if (!connectionString) throw new Error("DATABASE_URL is required");
 const client = postgres(connectionString, { prepare: false, onnotice: () => {} });
 export const db = drizzle(client);
 
-// Auto-create tables on first startup. Exported as a promise so server/index.ts
-// can await it before listening, and api/index.ts can await it per-request.
-export const ready = (async () => {
+// Auto-create / migrate tables. Runs once per process; if the database is
+// unreachable (e.g. a paused or waking Supabase project) the attempt is
+// forgotten so the next request retries instead of the process crashing.
+let schemaPromise: Promise<void> | null = null;
+export function ensureSchema(): Promise<void> {
+  if (!schemaPromise) {
+    schemaPromise = runSchema().catch((e) => {
+      schemaPromise = null;
+      throw e;
+    });
+  }
+  return schemaPromise;
+}
+
+async function runSchema() {
   await client.unsafe(`
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -142,7 +154,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 `);
-})();
+}
 
 export interface IStorage {
   // users

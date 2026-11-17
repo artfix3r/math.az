@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
-import { ready as dbReady } from "./storage";
+import { ensureSchema } from "./storage";
 
 export const app = express();
 const httpServer = createServer(app);
@@ -68,8 +68,20 @@ app.use((req, res, next) => {
 // Initialize the app (DB + routes + error handler + static/vite). Exported as a
 // single promise so both the local listener and the Vercel serverless handler
 // can await full readiness before serving requests.
+// Make sure the database schema exists before any API request runs. If the
+// database is unreachable, answer 503 (and retry on the next request) rather
+// than crashing the process.
+app.use("/api", async (_req, res, next) => {
+  try {
+    await ensureSchema();
+    next();
+  } catch (e) {
+    console.error("Database not ready:", e);
+    res.status(503).json({ message: "The database is not reachable right now. Please try again in a minute." });
+  }
+});
+
 export const ready = (async () => {
-  await dbReady;
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -104,7 +116,9 @@ export const ready = (async () => {
 // ALWAYS serve the app on the port specified in the environment variable PORT.
 // Other ports are firewalled. Default to 5000 if not specified.
 if (!process.env.VERCEL) {
-  ready.then(() => {
+  ready.then(async () => {
+    // Fail fast locally if the database is misconfigured.
+    await ensureSchema();
     const port = parseInt(process.env.PORT || "5000", 10);
     httpServer.listen(
       {
