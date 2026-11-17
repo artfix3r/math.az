@@ -14,6 +14,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, isEmailConfigured } from "./mailer";
+import { readSessionUserId, setSession, clearSession } from "./session";
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -49,14 +50,22 @@ function sanitize(u: User) {
   return rest;
 }
 
-// Lightweight auth: client sends x-user-id header. Sandboxed iframe blocks
-// cookies/localStorage, so the client keeps the user in React state and
-// echoes the id with each request.
+// The signed-in user comes only from the signed, httpOnly session cookie
+// (see ./session.ts). Nothing the client sends in headers or the body can
+// choose which user it is.
 async function authUser(req: Request): Promise<User | undefined> {
-  const id = Number(req.header("x-user-id"));
+  const id = readSessionUserId(req);
   if (!id) return undefined;
   return storage.getUser(id);
 }
+
+// Teacher accounts need the code in TEACHER_SIGNUP_CODE. If it is not set,
+// nobody can sign up as a teacher (students are always allowed).
+const TEACHER_SIGNUP_CODE = process.env.TEACHER_SIGNUP_CODE || "";
+function teacherCodeOk(code: unknown): boolean {
+  return !!TEACHER_SIGNUP_CODE && typeof code === "string" && code.trim() === TEACHER_SIGNUP_CODE;
+}
+const TEACHER_CODE_ERROR = "A valid teacher sign-up code is required to create a teacher account";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   const requireUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -71,16 +80,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   };
 
+  // ---- Ownership / access helpers ----
+  // Each returns the record when the signed-in user may act on it, otherwise
+  // sends a 404 (so we don't reveal whether someone else's record exists).
+  const notFound = (res: Response, what: string) =>
+    res.status(404).json({ message: `${what} not found` });
+
+  async function ownedGroup(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const g = await storage.getGroup(id);
+    if (!g || g.teacherId !== user.id) { notFound(res, "Group"); return undefined; }
+    return g;
+  }
+  async function ownedQuiz(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const q = await storage.getQuiz(id);
+    if (!q || q.teacherId !== user.id) { notFound(res, "Quiz"); return undefined; }
+    return q;
+  }
+  // A submission is the teacher's if it belongs to one of their quizzes.
+  async function ownedSubmission(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const sub = await storage.getSubmissionById(id);
+    const quiz = sub ? await storage.getQuiz(sub.quizId) : undefined;
+    if (!sub || !quiz || quiz.teacherId !== user.id) { notFound(res, "Submission"); return undefined; }
+    return sub;
+  }
+  // Students may see a quiz only if it is live (not a template) and assigned
+  // to a group they belong to.
+  async function studentCanSeeQuiz(user: User, quiz: Quiz) {
+    return quiz.isTemplate === 0 && quiz.groupId != null && (await storage.isMember(quiz.groupId, user.id));
+  }
+  // A teacher may only target their own groups (null = no group).
+  async function groupIsMine(user: User, groupId: unknown) {
+    if (groupId == null || groupId === "") return true;
+    const g = await storage.getGroup(Number(groupId));
+    return !!g && g.teacherId === user.id;
+  }
+  // Remove answer keys before sending a quiz to a student.
+  function stripAnswers(quiz: Quiz) {
+    let questions: Question[] = [];
+    try { questions = JSON.parse(quiz.questions || "[]"); } catch { /* keep empty */ }
+    const safe = questions.map(({ correctIndex, correctIndexes, correctText, correctNumber, tolerance, ...rest }) => rest);
+    return { ...quiz, questions: JSON.stringify(safe) };
+  }
+
   // ---------------- Auth ----------------
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const data = insertUserSchema.parse({ ...req.body, avatarColor: randColor() });
+      const { teacherCode, ...body } = req.body ?? {};
+      const data = insertUserSchema.parse({ ...body, avatarColor: randColor() });
+      if (data.role === "teacher" && !teacherCodeOk(teacherCode))
+        return res.status(403).json({ message: TEACHER_CODE_ERROR });
       if (await storage.getUserByEmail(data.email))
         return res.status(409).json({ message: "Email already registered" });
       if (await storage.getUserByUsername(data.username))
         return res.status(409).json({ message: "Username already taken" });
       const hashedPassword = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
       const user = await storage.createUser({ ...data, password: hashedPassword });
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
@@ -96,6 +154,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         : await storage.getUserByUsername(identifier);
       if (!user || !user.password || !(await bcrypt.compare(password, user.password)))
         return res.status(401).json({ message: "Invalid credentials" });
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
       res.status(400).json({ message: "Login failed" });
@@ -106,6 +165,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(sanitize((req as any).user));
   });
 
+  app.post("/api/auth/logout", (_req, res) => {
+    clearSession(res);
+    res.json({ ok: true });
+  });
+
   // Sign in / sign up with Google. The client sends the Google ID token from
   // Google Identity Services; we verify it server-side, then find-or-create a
   // local user keyed on the Google subject id (falling back to email match so
@@ -114,7 +178,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       if (!GOOGLE_CLIENT_ID)
         return res.status(503).json({ message: "Google sign-in is not configured on the server" });
-      const { credential, role } = googleAuthSchema.parse(req.body);
+      const { credential, role, teacherCode } = googleAuthSchema.parse(req.body);
       let payload;
       try {
         const ticket = await googleClient.verifyIdToken({
@@ -145,6 +209,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       // 3) Brand-new user -> create one (no local password yet).
       if (!user) {
+        if (role === "teacher" && !teacherCodeOk(teacherCode))
+          return res.status(403).json({ message: TEACHER_CODE_ERROR });
         const username = await uniqueUsernameFromEmail(email);
         user = await storage.createUser({
           email,
@@ -156,6 +222,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           googleId,
         } as any);
       }
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
@@ -225,12 +292,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/groups/:id/members", requireUser, async (req, res) => {
-    const members = await storage.getMembers(Number(req.params.id));
+    const user = (req as any).user as User;
+    const gid = Number(req.params.id);
+    if (user.role === "teacher") {
+      if (!(await ownedGroup(req, res, gid))) return;
+    } else if (!(await storage.isMember(gid, user.id))) {
+      return notFound(res, "Group");
+    }
+    const members = await storage.getMembers(gid);
     res.json(members.map(sanitize));
   });
 
   app.post("/api/groups/:id/members", requireUser, requireTeacher, async (req, res) => {
     const gid = Number(req.params.id);
+    if (!(await ownedGroup(req, res, gid))) return;
     const { identifier } = z.object({ identifier: z.string().min(1) }).parse(req.body);
     const student = identifier.includes("@")
       ? await storage.getUserByEmail(identifier)
@@ -244,11 +319,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/groups/:id/members/:studentId", requireUser, requireTeacher, async (req, res) => {
+    if (!(await ownedGroup(req, res, Number(req.params.id)))) return;
     await storage.removeMember(Number(req.params.id), Number(req.params.studentId));
     res.json({ ok: true });
   });
 
   app.delete("/api/groups/:id", requireUser, requireTeacher, async (req, res) => {
+    if (!(await ownedGroup(req, res, Number(req.params.id)))) return;
     await storage.deleteGroup(Number(req.params.id));
     res.json({ ok: true });
   });
@@ -275,9 +352,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/quizzes/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
     const quiz = await storage.getQuiz(Number(req.params.id));
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    res.json(quiz);
+    if (!quiz) return notFound(res, "Quiz");
+    if (user.role === "teacher") {
+      if (quiz.teacherId !== user.id) return notFound(res, "Quiz");
+      return res.json(quiz);
+    }
+    if (!(await studentCanSeeQuiz(user, quiz))) return notFound(res, "Quiz");
+    res.json(stripAnswers(quiz));
   });
 
   function validateQuestions(raw: string): string {
@@ -289,6 +372,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = (req as any).user as User;
       const body = { ...req.body, teacherId: user.id };
+      if (!(await groupIsMine(user, body.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
       if (body.questions) body.questions = validateQuestions(body.questions);
       const data = insertQuizSchema.parse(body);
       res.json(await storage.createQuiz(data));
@@ -299,17 +384,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.patch("/api/quizzes/:id", requireUser, requireTeacher, async (req, res) => {
-    const body = { ...req.body };
-    if (body.questions) body.questions = validateQuestions(body.questions);
-    const updated = await storage.updateQuiz(Number(req.params.id), body);
-    res.json(updated);
+    try {
+      const user = (req as any).user as User;
+      const quiz = await ownedQuiz(req, res, Number(req.params.id));
+      if (!quiz) return;
+      const { id: _id, teacherId: _t, createdAt: _c, ...body } = req.body ?? {};
+      if ("groupId" in body && !(await groupIsMine(user, body.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
+      if (body.questions) body.questions = validateQuestions(body.questions);
+      const updated = await storage.updateQuiz(quiz.id, body);
+      res.json(updated);
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: "Failed to update quiz" });
+    }
   });
 
   // Save as template (backup)
   app.post("/api/quizzes/:id/save-template", requireUser, requireTeacher, async (req, res) => {
     const user = (req as any).user as User;
-    const src = await storage.getQuiz(Number(req.params.id));
-    if (!src) return res.status(404).json({ message: "Quiz not found" });
+    const src = await ownedQuiz(req, res, Number(req.params.id));
+    if (!src) return;
     const tpl = await storage.createQuiz({
       title: src.title, description: src.description, teacherId: user.id,
       groupId: null, questions: src.questions, durationMinutes: src.durationMinutes,
@@ -321,9 +416,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Reuse a template -> creates a new live quiz copy
   app.post("/api/quizzes/:id/reuse", requireUser, requireTeacher, async (req, res) => {
     const user = (req as any).user as User;
-    const src = await storage.getQuiz(Number(req.params.id));
-    if (!src) return res.status(404).json({ message: "Quiz not found" });
+    const src = await ownedQuiz(req, res, Number(req.params.id));
+    if (!src) return;
     const { groupId, startAt } = req.body;
+    if (!(await groupIsMine(user, groupId)))
+      return res.status(400).json({ message: "That group is not yours" });
     const copy = await storage.createQuiz({
       title: src.title, description: src.description, teacherId: user.id,
       groupId: groupId ?? null, questions: src.questions,
@@ -333,7 +430,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/quizzes/:id", requireUser, requireTeacher, async (req, res) => {
-    await storage.deleteQuiz(Number(req.params.id));
+    const quiz = await ownedQuiz(req, res, Number(req.params.id));
+    if (!quiz) return;
+    await storage.deleteQuiz(quiz.id);
     res.json({ ok: true });
   });
 
@@ -342,7 +441,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/quizzes/:id/submit", requireUser, async (req, res) => {
     const user = (req as any).user as User;
     const quiz = await storage.getQuiz(Number(req.params.id));
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+    if (!quiz || user.role !== "student" || !(await studentCanSeeQuiz(user, quiz)))
+      return notFound(res, "Quiz");
     const existing = await storage.getSubmission(quiz.id, user.id);
     // maxAttempts: 0 = unlimited. A teacher "reopen" deletes the prior submission,
     // so a fresh attempt is allowed; otherwise enforce the configured limit.
@@ -351,7 +451,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const attemptNumber = existing ? existing.attemptNumber + 1 : 1;
     const autoSubmitted = req.body.autoSubmitted ? 1 : 0;
 
-    const answers = req.body.answers as Record<string, { answer: string | number }>;
+    const answers = (req.body.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, { answer: string | number }>;
     const questions: Question[] = JSON.parse(quiz.questions);
     let score = 0, maxScore = 0, needsGrading = 0;
     for (const q of questions) {
@@ -403,8 +503,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Teacher grades open/photo questions
   app.patch("/api/submissions/:id/grade", requireUser, requireTeacher, async (req, res) => {
+    const sub = await ownedSubmission(req, res, Number(req.params.id));
+    if (!sub) return;
     const { score, needsGrading, gradedPoints } = req.body;
-    const updated = await storage.updateSubmission(Number(req.params.id), {
+    const updated = await storage.updateSubmission(sub.id, {
       score, needsGrading: needsGrading ? 1 : 0,
       gradedPoints: typeof gradedPoints === "string" ? gradedPoints : JSON.stringify(gradedPoints ?? {}),
     });
@@ -412,7 +514,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/quizzes/:id/submissions", requireUser, requireTeacher, async (req, res) => {
-    const subs = await storage.getSubmissionsByQuiz(Number(req.params.id));
+    const quiz = await ownedQuiz(req, res, Number(req.params.id));
+    if (!quiz) return;
+    const subs = await storage.getSubmissionsByQuiz(quiz.id);
     const withNames = await Promise.all(subs.map(async (s) => {
       const student = await storage.getUser(s.studentId);
       return { ...s, studentName: student?.fullName, studentEmail: student?.email };
@@ -498,6 +602,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/sessions", requireUser, requireTeacher, async (req, res) => {
     try {
       const user = (req as any).user as User;
+      if (!(await groupIsMine(user, req.body?.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
       const data = insertSessionSchema.parse({ ...req.body, teacherId: user.id });
       res.json(await storage.createSession(data));
     } catch (e) {
@@ -507,7 +613,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/sessions/:id", requireUser, requireTeacher, async (req, res) => {
-    await storage.deleteSession(Number(req.params.id));
+    const user = (req as any).user as User;
+    const id = Number(req.params.id);
+    const mine = await storage.getSessionsByTeacher(user.id);
+    if (!mine.some((s) => s.id === id)) return notFound(res, "Session");
+    await storage.deleteSession(id);
     res.json({ ok: true });
   });
 
@@ -520,8 +630,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Teacher reopens / resets a student's attempt by removing the submission so
   // the student can take the quiz again (works during or after a quiz).
   app.delete("/api/submissions/:id", requireUser, requireTeacher, async (req, res) => {
-    const sub = await storage.getSubmissionById(Number(req.params.id));
-    if (!sub) return res.status(404).json({ message: "Submission not found" });
+    const sub = await ownedSubmission(req, res, Number(req.params.id));
+    if (!sub) return;
     await storage.deleteSubmission(sub.id);
     res.json({ ok: true });
   });
