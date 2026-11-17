@@ -76,7 +76,9 @@ async function buildAll() {
     platform: "node",
     bundle: true,
     format: "esm",
-    outfile: "api/index.js",
+    // api/index.js (committed) re-exports this file. Vercel checks that the
+    // api/ entry exists before the build runs, so it can't be generated.
+    outfile: "dist/server/vercel-handler.mjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },

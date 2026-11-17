@@ -16,7 +16,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 
 // disable prepared statements — safe for pgbouncer / Vercel serverless
-const client = postgres(connectionString, { prepare: false });
+const client = postgres(connectionString, { prepare: false, onnotice: () => {} });
 export const db = drizzle(client);
 
 // Auto-create tables on first startup. Exported as a promise so server/index.ts

@@ -15,5 +15,4 @@ data.db-journal
 *.log
 .DS_Store
 .vercel
-api/index.js
 api/index.cjs
