@@ -123,6 +123,19 @@ ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
 -- Uploaded materials can live in object storage instead of data_url.
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS storage_path TEXT NOT NULL DEFAULT '';
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS mime_type TEXT NOT NULL DEFAULT '';
+-- Hosts like Supabase expose the public schema through a web API. The app
+-- connects as the table owner (which bypasses RLS), so enabling RLS with no
+-- policies blocks that API without affecting the app.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
     ALTER TABLE users ADD CONSTRAINT users_google_id_unique UNIQUE (google_id);
