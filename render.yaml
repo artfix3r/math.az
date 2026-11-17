@@ -21,6 +21,14 @@ services:
       # Code required to sign up as a teacher. Leave unset to close teacher sign-up.
       - key: TEACHER_SIGNUP_CODE
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
       - key: APP_BASE_URL
         sync: false
       - key: GOOGLE_CLIENT_ID

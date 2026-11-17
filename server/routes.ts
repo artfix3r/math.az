@@ -15,6 +15,10 @@ import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, isEmailConfigured } from "./mailer";
 import { readSessionUserId, setSession, clearSession } from "./session";
+import {
+  isStorageEnabled, publicStorageConfig, createUploadUrl, createDownloadUrl,
+  removeFiles, teacherPrefix, MAX_UPLOAD_BYTES,
+} from "./file-storage";
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -668,8 +672,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Teacher can review all submitted feedback in-app.
-  app.get("/api/feedback", requireUser, requireTeacher, async (_req, res) => {
+  // Only site admins (emails listed in ADMIN_EMAILS, comma-separated) can read
+  // feedback, because it contains visitors' names and email addresses.
+  const ADMIN_EMAILS = new Set(
+    (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
+  );
+  app.get("/api/feedback", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    if (!ADMIN_EMAILS.has(user.email.toLowerCase())) return res.status(403).json({ message: "Admins only" });
     res.json(await storage.getAllFeedback());
   });
 
@@ -679,10 +689,94 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Each file is public (all of the teacher's students) or private (only the
   // groups the teacher selects).
 
+  // Never send file contents in list responses (they used to include the whole
+  // base64 file). Clients open files through /api/materials/:id/file instead.
+  const publicMaterial = (m: any) => {
+    const { dataUrl, storagePath, ...rest } = m;
+    return { ...rest, dataUrl: "", hasFile: !!(dataUrl || storagePath) };
+  };
   // Attach the group ids a private material is shared with.
   const withGroupIds = async (m: any) => ({
-    ...m,
+    ...publicMaterial(m),
     groupIds: (await storage.getMaterialGroups(m.id)).map((g) => g.groupId),
+  });
+
+  // Validate the file fields of a create/update body. Returns an error message
+  // or null. Mutates `data` so exactly one of storagePath / dataUrl is used.
+  function checkFileFields(user: User, data: any): string | null {
+    if (data.linkUrl && !/^https?:\/\//i.test(String(data.linkUrl)))
+      return "Links must start with http:// or https://";
+    if (data.storagePath) {
+      if (!isStorageEnabled()) return "File storage is not configured";
+      if (!String(data.storagePath).startsWith(teacherPrefix(user.id)) || String(data.storagePath).includes(".."))
+        return "Invalid file";
+      data.dataUrl = "";
+    } else if (data.dataUrl) {
+      // Legacy path: file embedded in the database. Only when storage is off.
+      if (isStorageEnabled()) return "Upload the file to storage first";
+      if (!/^data:[\w.+-]+\/[\w.+-]+;base64,/.test(String(data.dataUrl))) return "Invalid file";
+    }
+    return null;
+  }
+
+  // Can this user open this material's file?
+  async function canOpenMaterial(user: User, m: any) {
+    if (m.kind !== "file") return false;
+    if (user.role === "teacher") return m.teacherId === user.id;
+    const visible = await storage.getMaterialsForStudent(user.id);
+    return visible.some((v) => v.id === m.id);
+  }
+
+  // Browser needs this to decide how to upload.
+  app.get("/api/storage/config", requireUser, (_req, res) => {
+    res.json(publicStorageConfig());
+  });
+
+  // Step 1 of an upload: get a one-time signed URL to upload straight to storage.
+  app.post("/api/materials/upload-url", requireUser, requireTeacher, async (req, res) => {
+    try {
+      if (!isStorageEnabled()) return res.status(503).json({ message: "File storage is not configured" });
+      const user = (req as any).user as User;
+      const { fileName, sizeBytes } = z
+        .object({ fileName: z.string().min(1).max(300), sizeBytes: z.number().int().nonnegative() })
+        .parse(req.body);
+      if (sizeBytes > MAX_UPLOAD_BYTES)
+        return res.status(413).json({ message: `Files can be at most ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB` });
+      res.json(await createUploadUrl(user.id, fileName));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      console.error("upload-url failed", e);
+      res.status(500).json({ message: "Could not start the upload" });
+    }
+  });
+
+  // Open / download a material's file after an access check.
+  app.get("/api/materials/:id/file", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const m = await storage.getMaterial(Number(req.params.id));
+    if (!m || !(await canOpenMaterial(user, m))) return notFound(res, "Material");
+    const download = req.query.download === "1";
+    res.setHeader("Cache-Control", "private, no-store");
+    if (m.storagePath) {
+      try {
+        return res.redirect(302, await createDownloadUrl(m.storagePath, download ? m.name : undefined));
+      } catch (e) {
+        console.error("download url failed", e);
+        return res.status(502).json({ message: "Could not open the file" });
+      }
+    }
+    const match = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(m.dataUrl || "");
+    if (!match) return notFound(res, "File");
+    const body = match[2] ? Buffer.from(match[3], "base64") : Buffer.from(decodeURIComponent(match[3]));
+    res.setHeader("Content-Type", match[1]);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Uploaded HTML/SVG must not run scripts on our origin.
+    res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'; img-src data:; media-src data:; style-src 'unsafe-inline'");
+    res.setHeader(
+      "Content-Disposition",
+      `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(m.name)}`,
+    );
+    res.send(body);
   });
 
   // GET: teacher sees their full tree; student sees only accessible items.
@@ -694,7 +788,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } else {
       const items = await storage.getMaterialsForStudent(user.id);
       // Strip group sharing details for students.
-      res.json(items);
+      res.json(items.map(publicMaterial));
     }
   });
 
@@ -705,6 +799,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ? (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n))
         : [];
       const data = insertMaterialSchema.parse({ ...req.body, teacherId: user.id });
+      const fileErr = checkFileFields(user, data);
+      if (fileErr) return res.status(400).json({ message: fileErr });
       // Validate parent belongs to this teacher and is a folder.
       if (data.parentId != null) {
         const parent = await storage.getMaterial(data.parentId);
@@ -738,16 +834,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const patch = insertMaterialSchema.partial().parse(req.body);
       // Don't allow reassigning ownership.
       delete (patch as any).teacherId;
-      const updated = await storage.updateMaterial(id, patch);
-      // Update group sharing if provided.
+      const fileErr = checkFileFields(user, patch);
+      if (fileErr) return res.status(400).json({ message: fileErr });
+      // A new upload replaces the old file entirely.
+      const replacingFile = !!(patch.storagePath || patch.dataUrl);
+      if (replacingFile) {
+        if (!patch.storagePath) (patch as any).storagePath = "";
+        if (!patch.dataUrl) (patch as any).dataUrl = "";
+      }
+      if (patch.parentId != null) {
+        const parent = await storage.getMaterial(patch.parentId);
+        if (!parent || parent.teacherId !== user.id || parent.kind !== "folder" || parent.id === id)
+          return res.status(400).json({ message: "Invalid parent folder" });
+      }
+      // Validate group sharing before changing anything.
+      let groupIds: number[] | null = null;
       if (Array.isArray(req.body.groupIds)) {
-        const groupIds = (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
+        groupIds = (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
         const teacherGroups = await storage.getGroupsByTeacher(user.id);
         const owned = new Set(teacherGroups.map((g) => g.id));
         if (!groupIds.every((g) => owned.has(g)))
           return res.status(400).json({ message: "One or more groups are not yours" });
-        await storage.setMaterialGroups(id, groupIds);
       }
+      const updated = await storage.updateMaterial(id, patch);
+      if (groupIds) await storage.setMaterialGroups(id, groupIds);
+      if (replacingFile && existing.storagePath && existing.storagePath !== patch.storagePath)
+        await removeFiles([existing.storagePath]);
       res.json(await withGroupIds(updated));
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
@@ -761,7 +873,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const existing = await storage.getMaterial(id);
     if (!existing || existing.teacherId !== user.id)
       return res.status(404).json({ message: "Material not found" });
-    await storage.deleteMaterial(id);
+    const paths = await storage.deleteMaterial(id);
+    await removeFiles(paths);
     res.json({ ok: true });
   });
 

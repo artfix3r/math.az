@@ -239,6 +239,11 @@ export const materials = pgTable("materials", {
   fileType: text("file_type").notNull().default("other"), // for files only
   // For uploaded files: a base64 data URI (data:<mime>;base64,....). Empty for folders/links.
   dataUrl: text("data_url").notNull().default(""),
+  // For files kept in object storage (Supabase): the object path in the bucket.
+  // When set, dataUrl is empty and the file is served via a signed link.
+  storagePath: text("storage_path").notNull().default(""),
+  // MIME type of an uploaded file (e.g. "application/pdf"). Empty if unknown.
+  mimeType: text("mime_type").notNull().default(""),
   // For YouTube / external links. Empty for folders / uploaded files.
   linkUrl: text("link_url").notNull().default(""),
   // Original size in bytes (uploaded files) for display. 0 for folders/links.

@@ -432,13 +432,14 @@ const en: Dict = {
   "mat.replaceFile": "Replace file (optional)",
   "mat.keepFile": "Leave empty to keep the current file.",
   "mat.currentFile": "Current: {name}",
-  "mat.tooBig": "File is too large. Please keep files under 50 MB.",
+  "mat.tooBig": "File is too large.",
+  "mat.uploading": "Uploading…",
   "mat.fileRequired": "Please choose a file.",
   "mat.urlRequired": "Please enter a URL.",
   "mat.badge.public": "Public",
   "mat.badge.private": "Private",
   "mat.folder": "Folder",
-  "mat.uploadFailed": "Could not read that file.",
+  "mat.uploadFailed": "Could not upload that file.",
 };
 
 const az: Dict = {
@@ -847,13 +848,14 @@ const az: Dict = {
   "mat.replaceFile": "Faylı dəyiş (ixtiyari)",
   "mat.keepFile": "Mövcud faylı saxlamaq üçün boş buraxın.",
   "mat.currentFile": "Hazırkı: {name}",
-  "mat.tooBig": "Fayl çox böyükdür. Zəhmət olmasa 50 MB-dan kiçik fayllar seçin.",
+  "mat.tooBig": "Fayl çox böyükdür.",
+  "mat.uploading": "Yüklənir…",
   "mat.fileRequired": "Zəhmət olmasa fayl seçin.",
   "mat.urlRequired": "Zəhmət olmasa URL daxil edin.",
   "mat.badge.public": "Açıq",
   "mat.badge.private": "Şəxsi",
   "mat.folder": "Qovluq",
-  "mat.uploadFailed": "Faylı oxumaq mümkün olmadı.",
+  "mat.uploadFailed": "Faylı yükləmək mümkün olmadı.",
 };
 
 const ru: Dict = {
@@ -1262,13 +1264,14 @@ const ru: Dict = {
   "mat.replaceFile": "Заменить файл (необязательно)",
   "mat.keepFile": "Оставьте пустым, чтобы сохранить текущий файл.",
   "mat.currentFile": "Текущий: {name}",
-  "mat.tooBig": "Файл слишком большой. Используйте файлы до 50 МБ.",
+  "mat.tooBig": "Файл слишком большой.",
+  "mat.uploading": "Загрузка…",
   "mat.fileRequired": "Пожалуйста, выберите файл.",
   "mat.urlRequired": "Пожалуйста, введите URL.",
   "mat.badge.public": "Открыто",
   "mat.badge.private": "Личное",
   "mat.folder": "Папка",
-  "mat.uploadFailed": "Не удалось прочитать файл.",
+  "mat.uploadFailed": "Не удалось загрузить файл.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

@@ -120,6 +120,9 @@ ALTER TABLE submissions ADD COLUMN IF NOT EXISTS attempt_number INTEGER NOT NULL
 -- Google sign-in + nullable password (Google-only accounts have no local password).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT;
 ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+-- Uploaded materials can live in object storage instead of data_url.
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS storage_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS mime_type TEXT NOT NULL DEFAULT '';
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
     ALTER TABLE users ADD CONSTRAINT users_google_id_unique UNIQUE (google_id);
@@ -183,7 +186,7 @@ export interface IStorage {
   getMaterial(id: number): Promise<Material | undefined>;
   getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
   getMaterialsForStudent(studentId: number): Promise<Material[]>;
-  deleteMaterial(id: number): Promise<void>;
+  deleteMaterial(id: number): Promise<string[]>;
   setMaterialGroups(materialId: number, groupIds: number[]): Promise<void>;
   getMaterialGroups(materialId: number): Promise<MaterialGroup[]>;
 }
@@ -445,6 +448,9 @@ export class DatabaseStorage implements IStorage {
     const ids = Array.from(toDelete);
     await db.delete(materialGroups).where(inArray(materialGroups.materialId, ids));
     await db.delete(materials).where(inArray(materials.id, ids));
+    // Return the storage objects that belonged to the deleted nodes so the
+    // caller can remove them from the bucket.
+    return all.filter((m) => toDelete.has(m.id) && m.storagePath).map((m) => m.storagePath);
   }
   async setMaterialGroups(materialId: number, groupIds: number[]) {
     await db.delete(materialGroups).where(eq(materialGroups.materialId, materialId));

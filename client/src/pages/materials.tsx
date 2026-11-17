@@ -25,6 +25,7 @@ import {
   ExternalLink, FolderOpen, Pencil,
 } from "lucide-react";
 import type { Group } from "@shared/schema";
+import { uploadMaterialFile, maxUploadBytes, materialFileUrl } from "@/lib/upload";
 
 // Material as returned by the API (teacher responses also include groupIds).
 type Material = {
@@ -34,7 +35,8 @@ type Material = {
   name: string;
   parentId: number | null;
   fileType: "pdf" | "video" | "image" | "audio" | "youtube" | "link" | "other";
-  dataUrl: string;
+  dataUrl: string; // always "" from the API; use materialFileUrl()
+  hasFile?: boolean;
   linkUrl: string;
   sizeBytes: number;
   visibility: "public" | "private";
@@ -42,7 +44,6 @@ type Material = {
   groupIds?: number[];
 };
 
-const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function iconFor(m: Material) {
   if (m.kind === "folder") return Folder;
@@ -197,7 +198,7 @@ function MaterialCard({
     },
   });
 
-  const openLink = m.fileType === "youtube" || m.fileType === "link" ? m.linkUrl : m.dataUrl;
+  const openLink = m.fileType === "youtube" || m.fileType === "link" ? m.linkUrl : materialFileUrl(m.id);
 
   return (
     <Card className="flex flex-col p-4" data-testid={`material-${m.id}`}>
@@ -241,11 +242,18 @@ function MaterialCard({
         )}
 
         {m.kind === "file" && m.fileType !== "youtube" && m.fileType !== "link" && (
-          <a href={m.dataUrl} download={m.name} data-testid={`download-${m.id}`}>
-            <Button size="sm" variant="secondary" className="gap-1.5 font-bold">
-              <Download className="h-3.5 w-3.5" /> {t("mat.download")}
-            </Button>
-          </a>
+          <>
+            <a href={openLink} target="_blank" rel="noopener noreferrer" data-testid={`file-open-${m.id}`}>
+              <Button size="sm" variant="secondary" className="gap-1.5 font-bold">
+                <ExternalLink className="h-3.5 w-3.5" /> {t("mat.open")}
+              </Button>
+            </a>
+            <a href={materialFileUrl(m.id, true)} data-testid={`download-${m.id}`}>
+              <Button size="sm" variant="ghost" className="gap-1.5 font-bold">
+                <Download className="h-3.5 w-3.5" /> {t("mat.download")}
+              </Button>
+            </a>
+          </>
         )}
 
         {isTeacher && (
@@ -363,7 +371,7 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
   const [groupIds, setGroupIds] = useState<number[]>([]);
   // Uploaded file state
   const [fileName, setFileName] = useState("");
-  const [dataUrl, setDataUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<Material["fileType"]>("other");
   const [sizeBytes, setSizeBytes] = useState(0);
 
@@ -372,32 +380,28 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
   function reset() {
     setType("upload"); setDisplayName(""); setUrl("");
     setVisibility("public"); setGroupIds([]);
-    setFileName(""); setDataUrl(""); setFileType("other"); setSizeBytes(0);
+    setFileName(""); setFile(null); setFileType("other"); setSizeBytes(0);
   }
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const f = input.files?.[0];
     if (!f) return;
-    if (f.size > MAX_BYTES) {
+    if (f.size > (await maxUploadBytes())) {
       toast({ title: t("mat.tooBig"), variant: "destructive" });
-      e.target.value = "";
+      input.value = "";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDataUrl(String(reader.result || ""));
-      setFileName(f.name);
-      setFileType(fileTypeFromMime(f.type));
-      setSizeBytes(f.size);
-    };
-    reader.onerror = () => toast({ title: t("mat.uploadFailed"), variant: "destructive" });
-    reader.readAsDataURL(f);
+    setFile(f);
+    setFileName(f.name);
+    setFileType(fileTypeFromMime(f.type));
+    setSizeBytes(f.size);
   }
 
   const finalName = displayName.trim() || (type === "upload" ? fileName : url.trim());
 
   function valid() {
-    if (type === "upload") return !!dataUrl && !!finalName;
+    if (type === "upload") return !!file && !!finalName;
     return !!url.trim() && !!finalName;
   }
 
@@ -411,8 +415,9 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
         groupIds: visibility === "private" ? groupIds : [],
       };
       if (type === "upload") {
+        if (!file) throw new Error(t("mat.uploadFailed"));
+        Object.assign(payload, await uploadMaterialFile(file));
         payload.fileType = fileType;
-        payload.dataUrl = dataUrl;
         payload.sizeBytes = sizeBytes;
       } else if (type === "youtube") {
         payload.fileType = "youtube";
@@ -428,6 +433,9 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
       setOpen(false);
       reset();
       toast({ title: t("mat.added") });
+    },
+    onError: (err: any) => {
+      toast({ title: t("mat.uploadFailed"), description: err?.message, variant: "destructive" });
     },
   });
 
@@ -542,7 +550,7 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
             onClick={() => create.mutate()}
             data-testid="button-material-create"
           >
-            {t("mat.create")}
+            {create.isPending ? t("mat.uploading") : t("mat.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -565,7 +573,7 @@ function EditMaterialDialog({
   const [visibility, setVisibility] = useState<"public" | "private">(m.visibility);
   const [groupIds, setGroupIds] = useState<number[]>(m.groupIds ?? []);
   // Optional file replacement (uploads only)
-  const [newDataUrl, setNewDataUrl] = useState("");
+  const [newFile, setNewFile] = useState<File | null>(null);
   const [newFileType, setNewFileType] = useState<Material["fileType"]>(m.fileType);
   const [newSizeBytes, setNewSizeBytes] = useState(0);
   const [newFileName, setNewFileName] = useState("");
@@ -578,26 +586,22 @@ function EditMaterialDialog({
     setUrl(m.linkUrl);
     setVisibility(m.visibility);
     setGroupIds(m.groupIds ?? []);
-    setNewDataUrl(""); setNewFileType(m.fileType); setNewSizeBytes(0); setNewFileName("");
+    setNewFile(null); setNewFileType(m.fileType); setNewSizeBytes(0); setNewFileName("");
   }
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const f = input.files?.[0];
     if (!f) return;
-    if (f.size > MAX_BYTES) {
+    if (f.size > (await maxUploadBytes())) {
       toast({ title: t("mat.tooBig"), variant: "destructive" });
-      e.target.value = "";
+      input.value = "";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setNewDataUrl(String(reader.result || ""));
-      setNewFileType(fileTypeFromMime(f.type));
-      setNewSizeBytes(f.size);
-      setNewFileName(f.name);
-    };
-    reader.onerror = () => toast({ title: t("mat.uploadFailed"), variant: "destructive" });
-    reader.readAsDataURL(f);
+    setNewFile(f);
+    setNewFileType(fileTypeFromMime(f.type));
+    setNewSizeBytes(f.size);
+    setNewFileName(f.name);
   }
 
   function toggleGroup(id: number) {
@@ -612,9 +616,9 @@ function EditMaterialDialog({
         payload.groupIds = visibility === "private" ? groupIds : [];
         if (isLink) {
           payload.linkUrl = url.trim();
-        } else if (newDataUrl) {
+        } else if (newFile) {
           // Teacher chose to replace the underlying file.
-          payload.dataUrl = newDataUrl;
+          Object.assign(payload, await uploadMaterialFile(newFile));
           payload.fileType = newFileType;
           payload.sizeBytes = newSizeBytes;
         }
@@ -625,6 +629,9 @@ function EditMaterialDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       onOpenChange(false);
       toast({ title: t("mat.saved") });
+    },
+    onError: (err: any) => {
+      toast({ title: t("mat.uploadFailed"), description: err?.message, variant: "destructive" });
     },
   });
 
@@ -719,7 +726,7 @@ function EditMaterialDialog({
             onClick={() => save.mutate()}
             data-testid="button-edit-save"
           >
-            {t("mat.save")}
+            {save.isPending ? t("mat.uploading") : t("mat.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
