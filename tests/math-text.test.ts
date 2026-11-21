@@ -50,3 +50,21 @@ test("fractions inside a sentence are drawn full size, not shrunk", () => {
   // KaTeX shrinks inline fraction digits with these size classes.
   assert.doesNotMatch(renderMathHtml("Add $\\frac{3}{4}$"), /reset-size6 size3/);
 });
+
+import { joinParts, toParts } from "../client/src/lib/rich-math";
+
+test("rich editor: parts from text with formulas", () => {
+  assert.deepEqual(toParts("Solve $x^2=4$ now"), [
+    { kind: "text", value: "Solve " }, { kind: "math", value: "x^2=4" }, { kind: "text", value: " now" },
+  ]);
+});
+
+test("rich editor: joining escapes a literal dollar in text", () => {
+  const s = joinParts([{ kind: "text", value: "Costs 5$ and " }, { kind: "math", value: "\\frac{1}{2}" }]);
+  assert.equal(s, "Costs 5\\$ and $\\frac{1}{2}$");
+  assert.deepEqual(toParts(s), [{ kind: "text", value: "Costs 5$ and " }, { kind: "math", value: "\\frac{1}{2}" }]);
+});
+
+test("rich editor: display formulas come back as inline-able math parts", () => {
+  assert.deepEqual(toParts("$$a+b$$"), [{ kind: "math", value: "a+b" }]);
+});

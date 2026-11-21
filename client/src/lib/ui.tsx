@@ -15,14 +15,17 @@ export function colorOf(c?: string) {
   return COLOR_MAP[c ?? "blue"] ?? COLOR_MAP.blue;
 }
 
-/** A square of squared paper with a red-pen tick, then the wordmark. */
+/** π with a red-pen tick at its corner, then the wordmark. */
 export function Logo({ className, inverted }: { className?: string; inverted?: boolean }) {
+  const tile = inverted ? "#fff" : "#2340A0";
+  const ink = inverted ? "#2340A0" : "#fff";
+  const pen = inverted ? "#D92D2D" : "#FF5A5A";
   return (
     <span className={cn("inline-flex items-center gap-2.5 font-semibold tracking-tight", className)}>
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className="shrink-0">
-        <rect x="0.75" y="0.75" width="26.5" height="26.5" rx="5" fill="#fff" stroke={inverted ? "#fff" : "#2340A0"} strokeWidth="1.5" />
-        <path d="M7 1v26M14 1v26M21 1v26M1 7h26M1 14h26M1 21h26" stroke="#C9D6F0" strokeWidth="1" />
-        <path d="M7.5 14.5l4 4.5L21 8.5" stroke="#D92D2D" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" aria-hidden="true" className="shrink-0">
+        <rect width="48" height="48" rx="11" fill={tile} />
+        <path d="M11 15h26M19 15v19M30 15v14c0 4 2 5 6 4" stroke={ink} strokeWidth="5" strokeLinecap="round" />
+        <path d="M33 9l3 3 5-6" stroke={pen} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <span className={cn(inverted ? "text-white" : "text-foreground")}>
         math<span className={inverted ? "text-white/60" : "text-muted-foreground"}>.az</span>
