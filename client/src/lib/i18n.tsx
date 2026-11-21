@@ -685,6 +685,19 @@ const en: Dict = {
   "imp.added": "Added {n} questions",
   "imp.seePhoto": "Look at the picture and answer.",
   "imp.unmarked": "No correct answer marked in {n}: the first option will be used until you change it.",
+  "formula.group.basic": "Basic",
+  "formula.group.functions": "Functions",
+  "formula.group.calculus": "Limits & integrals",
+  "formula.group.sets": "Sets & logic",
+  "formula.group.geometry": "Geometry",
+  "formula.group.greek": "Greek letters",
+  "math.system": "System of equations",
+  "math.vector": "Vector",
+  "math.segment": "Segment",
+  "math.arc": "Arc",
+  "math.ln": "Natural logarithm",
+  "math.vectorLength": "Length of a vector",
+  "math.dotProduct": "Dot product",
 };
 
 const az: Dict = {
@@ -1346,6 +1359,19 @@ const az: Dict = {
   "imp.added": "{n} sual əlavə edildi",
   "imp.seePhoto": "Şəklə baxın və cavab verin.",
   "imp.unmarked": "{n} sualda düzgün cavab qeyd olunmayıb: dəyişənə qədər birinci variant düzgün sayılacaq.",
+  "formula.group.basic": "Əsas",
+  "formula.group.functions": "Funksiyalar",
+  "formula.group.calculus": "Limit və inteqral",
+  "formula.group.sets": "Çoxluq və məntiq",
+  "formula.group.geometry": "Həndəsə",
+  "formula.group.greek": "Yunan hərfləri",
+  "math.system": "Tənliklər sistemi",
+  "math.vector": "Vektor",
+  "math.segment": "Parça",
+  "math.arc": "Qövs",
+  "math.ln": "Natural loqarifm",
+  "math.vectorLength": "Vektorun uzunluğu",
+  "math.dotProduct": "Skalyar hasil",
 };
 
 const ru: Dict = {
@@ -2007,6 +2033,19 @@ const ru: Dict = {
   "imp.added": "Добавлено вопросов: {n}",
   "imp.seePhoto": "Посмотрите на картинку и ответьте.",
   "imp.unmarked": "В {n} вопр. не отмечен правильный ответ: пока будет засчитываться первый вариант.",
+  "formula.group.basic": "Основные",
+  "formula.group.functions": "Функции",
+  "formula.group.calculus": "Пределы и интегралы",
+  "formula.group.sets": "Множества и логика",
+  "formula.group.geometry": "Геометрия",
+  "formula.group.greek": "Греческие буквы",
+  "math.system": "Система уравнений",
+  "math.vector": "Вектор",
+  "math.segment": "Отрезок",
+  "math.arc": "Дуга",
+  "math.ln": "Натуральный логарифм",
+  "math.vectorLength": "Длина вектора",
+  "math.dotProduct": "Скалярное произведение",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

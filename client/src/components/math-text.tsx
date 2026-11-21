@@ -22,6 +22,7 @@ const QUICK: { label: string; template: string; title: string }[] = [
   { label: "√", template: "\\sqrt{#?}", title: "sqrt" },
   { label: "x₁", template: "#?_{#?}", title: "index" },
   { label: "π", template: "\\pi", title: "pi" },
+  { label: "ln", template: "\\ln\\left(#?\\right)", title: "ln" },
   { label: "≤", template: "\\le", title: "le" },
   { label: "°", template: "#?^{\\circ}", title: "degree" },
 ];
