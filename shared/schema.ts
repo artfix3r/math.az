@@ -123,6 +123,8 @@ export const quizzes = pgTable("quizzes", {
   // Per-student variants (shared/quiz-variants.ts): give each student this many
   // random questions (0 = all) and/or shuffle question and option order.
   pickCount: integer("pick_count").notNull().default(0),
+  // Homework deadline (epoch ms). After it, students can no longer submit.
+  dueAt: ts("due_at"),
   shuffle: integer("shuffle").notNull().default(0),
   createdAt: ts("created_at").notNull(),
 });
@@ -297,3 +299,11 @@ export const bankQuestions = pgTable("bank_questions", {
   createdAt: ts("created_at").notNull(),
 });
 export type BankQuestion = typeof bankQuestions.$inferSelect;
+
+// One row per reminder email sent, so a student is reminded once per quiz.
+export const reminderLog = pgTable("reminder_log", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quiz_id").notNull(),
+  studentId: integer("student_id").notNull(),
+  sentAt: ts("sent_at").notNull(),
+});

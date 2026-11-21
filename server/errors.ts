@@ -34,6 +34,7 @@ export const ERROR_CODES: Record<string, string> = {
   "That user is not a student": "not_a_student",
   "Student is already in this group": "already_in_group",
   "You have used all attempts for this quiz": "no_attempts_left",
+  "The deadline for this quiz has passed": "deadline_passed",
   "Failed to create quiz": "save_failed",
   "Failed to update quiz": "save_failed",
   "Failed to create session": "save_failed",

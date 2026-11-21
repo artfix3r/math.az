@@ -60,6 +60,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
   const [groupId, setGroupId] = useState<string>("none");
   const [duration, setDuration] = useState(30);
   const [startAt, setStartAt] = useState("");
+  const [dueAt, setDueAt] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [pickCount, setPickCount] = useState(0);
   const [shuffle, setShuffle] = useState(false);
@@ -72,6 +73,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
       setGroupId(existing.groupId ? String(existing.groupId) : "none");
       setDuration(existing.durationMinutes);
       setStartAt(toLocalInput(existing.startAt));
+      setDueAt(toLocalInput(existing.dueAt));
       setMaxAttempts((existing as any).maxAttempts ?? 1);
       setPickCount(existing.pickCount ?? 0);
       setShuffle(!!existing.shuffle);
@@ -103,6 +105,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
         pickCount: pickCount > 0 && pickCount < questions.length ? Math.floor(pickCount) : 0,
         shuffle: shuffle ? 1 : 0,
         startAt: startAt ? new Date(startAt).getTime() : null,
+        dueAt: dueAt ? new Date(dueAt).getTime() : null,
         questions: JSON.stringify(questions.map((q) => ({ ...q, points: Number(q.points) || 1 }))),
         isTemplate: 0,
       };
@@ -165,7 +168,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
           <Label className="font-bold">{t("qb.descLabel")} ({t("common.optional")})</Label>
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("qb.descPlaceholder")} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label className="font-bold">{t("qb.assignGroup")}</Label>
             <Select value={groupId} onValueChange={setGroupId}>
@@ -181,6 +184,10 @@ export default function QuizBuilder({ id }: { id?: number }) {
             <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} data-testid="input-start-at" />
           </div>
           <div className="space-y-1.5">
+            <Label className="font-bold">{t("due.label")}</Label>
+            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} data-testid="input-due-at" />
+          </div>
+          <div className="space-y-1.5">
             <Label className="font-bold">{t("qb.duration")}</Label>
             <Input type="number" min={1} value={duration} onChange={(e) => setDuration(Number(e.target.value))} data-testid="input-duration" />
           </div>
@@ -189,7 +196,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
             <Input type="number" min={0} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} data-testid="input-max-attempts" />
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")}</p>
+        <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")} {t("due.hint")}</p>
         <div className="grid gap-4 rounded-xl border border-dashed p-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="font-bold">{t("variant.pickCount")}</Label>

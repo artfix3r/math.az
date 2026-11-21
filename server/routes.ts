@@ -13,7 +13,9 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
-import { sendResetEmail, isEmailConfigured } from "./mailer";
+import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
+import { remindersToSend, REMINDER_WINDOW_MS } from "@shared/deadlines";
+import { timingSafeEqual } from "node:crypto";
 import { readSessionUserId, setSession, clearSession } from "./session";
 import { attachErrorCodes, zodErrorBody } from "./errors";
 import { buildVariant, gradeAnswers, answersToOriginal, variantSeed } from "@shared/quiz-variants";
@@ -444,6 +446,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const quiz = await storage.getQuiz(Number(req.params.id));
     if (!quiz || user.role !== "student" || !(await studentCanSeeQuiz(user, quiz)))
       return notFound(res, "Quiz");
+    if (quiz.dueAt && Date.now() > quiz.dueAt)
+      return res.status(409).json({ message: "The deadline for this quiz has passed" });
     const existing = await storage.getSubmission(quiz.id, user.id);
     // maxAttempts: 0 = unlimited. A teacher "reopen" deletes the prior submission,
     // so a fresh attempt is allowed; otherwise enforce the configured limit.
@@ -840,6 +844,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const paths = await storage.deleteMaterial(id);
     await removeFiles(paths);
     res.json({ ok: true });
+  });
+
+  // ---- Homework reminders ----
+  // Called every hour by a scheduled job (Supabase pg_cron) with
+  // "Authorization: Bearer $CRON_SECRET". Emails students whose homework is
+  // due within 24 hours and who haven't submitted, once per quiz.
+  app.post("/api/cron/reminders", async (req, res) => {
+    const secret = process.env.CRON_SECRET || "";
+    const given = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const ok = secret.length >= 8 && given.length === secret.length &&
+      timingSafeEqual(Buffer.from(given), Buffer.from(secret));
+    if (!ok) return res.status(401).json({ message: "Not authenticated" });
+
+    const now = Date.now();
+    const quizzes = await storage.getQuizzesDueBetween(now, now + REMINDER_WINDOW_MS);
+    const members: Record<number, number[]> = {};
+    const users = new Map<number, User>();
+    const submitted = new Set<string>();
+    for (const q of quizzes) {
+      if (q.groupId && !members[q.groupId]) {
+        const m = await storage.getMembers(q.groupId);
+        members[q.groupId] = m.map((u) => u.id);
+        m.forEach((u) => users.set(u.id, u));
+      }
+      for (const s of await storage.getSubmissionsByQuiz(q.id)) submitted.add(`${q.id}:${s.studentId}`);
+    }
+    const alreadySent = await storage.getReminderKeys(quizzes.map((q) => q.id));
+    const due = remindersToSend({ now, quizzes, members, submitted, alreadySent });
+
+    let emailed = 0;
+    const reminders: { quizId: number; studentId: number }[] = [];
+    for (const r of due) {
+      // Record first, so an overlapping run can't email the same student twice.
+      if (!(await storage.logReminder(r.quizId, r.studentId))) continue;
+      reminders.push({ quizId: r.quizId, studentId: r.studentId });
+      const student = users.get(r.studentId);
+      if (student?.email && isEmailConfigured()) {
+        try {
+          await sendReminderEmail(student.email, student.fullName, r.title, r.dueAt, `${APP_BASE_URL}/#/quizzes/${r.quizId}/take`);
+          emailed++;
+        } catch (e) {
+          console.error("reminder email failed", e);
+        }
+      }
+    }
+    res.json({ reminders, emailed });
   });
 
   // ---- Question bank (teachers only, each teacher sees only their own) ----

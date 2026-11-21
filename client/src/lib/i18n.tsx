@@ -548,6 +548,14 @@ const en: Dict = {
   "variant.pickHint": "Each student gets this many questions picked at random from the {total} below. 0 = everyone gets all of them.",
   "variant.shuffle": "Shuffle questions and answers",
   "variant.shuffleHint": "Each student sees a different order, so neighbours can't copy.",
+  // --- Deadlines ---
+  "due.label": "Due date (homework)",
+  "due.hint": "Leave the due date empty for no deadline; after it, students can't submit.",
+  "due.by": "Due {date}",
+  "due.passed": "Deadline passed ({date})",
+  "due.closedButton": "Deadline passed",
+  "due.bannerTitle": "Homework due within 24 hours: {n}",
+  "err.deadline_passed": "The deadline for this quiz has passed.",
 };
 
 const az: Dict = {
@@ -1072,6 +1080,14 @@ const az: Dict = {
   "variant.pickHint": "Hər şagird aşağıdakı {total} sualdan təsadüfi seçilmiş bu qədər sual alır. 0 = hamı bütün sualları alır.",
   "variant.shuffle": "Sualları və cavabları qarışdır",
   "variant.shuffleHint": "Hər şagird fərqli ardıcıllıq görür, beləliklə yan-yana oturanlar köçürə bilməz.",
+  // --- Deadlines ---
+  "due.label": "Son tarix (ev tapşırığı)",
+  "due.hint": "Son tarix olmasın deyə boş buraxın; son tarixdən sonra şagirdlər testi göndərə bilməz.",
+  "due.by": "Son tarix: {date}",
+  "due.passed": "Son tarix keçib ({date})",
+  "due.closedButton": "Son tarix keçib",
+  "due.bannerTitle": "24 saat ərzində təhvil verilməli ev tapşırığı: {n}",
+  "err.deadline_passed": "Bu testin son tarixi keçib.",
 };
 
 const ru: Dict = {
@@ -1596,6 +1612,14 @@ const ru: Dict = {
   "variant.pickHint": "Каждый ученик получит столько вопросов, выбранных случайно из {total} ниже. 0 = все получают все вопросы.",
   "variant.shuffle": "Перемешать вопросы и ответы",
   "variant.shuffleHint": "У каждого ученика свой порядок, поэтому соседи не смогут списать.",
+  // --- Deadlines ---
+  "due.label": "Срок сдачи (домашнее задание)",
+  "due.hint": "Оставьте срок пустым, если его нет; после срока ученики не смогут отправить тест.",
+  "due.by": "Сдать до {date}",
+  "due.passed": "Срок прошёл ({date})",
+  "due.closedButton": "Срок прошёл",
+  "due.bannerTitle": "Домашние задания со сроком в ближайшие 24 часа: {n}",
+  "err.deadline_passed": "Срок сдачи этого теста прошёл.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };
@@ -1640,6 +1664,18 @@ export function readSavedLang(store: { getItem(k: string): string | null } | und
 // in lib/queryClient.ts).
 let currentLang: Lang = readSavedLang(typeof window !== "undefined" ? window.localStorage : undefined);
 export const getCurrentLang = () => currentLang;
+
+const LOCALES: Record<Lang, string> = { en: "en-GB", az: "az-AZ", ru: "ru-RU" };
+
+/** A date and time written in the site's language, e.g. "22 noyabr, şənbə 14:30". */
+export function formatDateTime(ts: number, lang: Lang = currentLang): string {
+  // Date and time are formatted separately: some locales (az) otherwise join
+  // them with odd separators like "/".
+  const d = new Date(ts);
+  const date = new Intl.DateTimeFormat(LOCALES[lang], { weekday: "long", day: "numeric", month: "long" }).format(d);
+  const time = new Intl.DateTimeFormat(LOCALES[lang], { hour: "2-digit", minute: "2-digit" }).format(d);
+  return `${date} ${time}`;
+}
 
 type I18nCtx = {
   lang: Lang;

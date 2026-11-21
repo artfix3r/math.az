@@ -46,3 +46,11 @@ test("an unknown or missing saved language falls back to Azerbaijani", () => {
   assert.equal(readSavedLang({ getItem: () => "xx" }), "az");
   assert.equal(readSavedLang({ getItem: () => { throw new Error("blocked"); } }), "az");
 });
+
+test("dates are written in the site's language", async () => {
+  const { formatDateTime } = await import("../client/src/lib/i18n");
+  const ts = Date.UTC(2026, 10, 22, 14, 30);
+  assert.match(formatDateTime(ts, "az"), /noyabr/i);
+  assert.match(formatDateTime(ts, "ru"), /ноя/i);
+  assert.match(formatDateTime(ts, "en"), /Nov/);
+});

@@ -1,6 +1,6 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
-  materials, materialGroups, passwordResetTokens, bankQuestions,
+  materials, materialGroups, passwordResetTokens, bankQuestions, reminderLog,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
@@ -10,7 +10,7 @@ import type {
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lte } from "drizzle-orm";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -161,6 +161,16 @@ ALTER TABLE bank_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pick_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS question_ids TEXT NOT NULL DEFAULT '';
+-- Homework deadlines and reminders.
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS due_at BIGINT;
+CREATE TABLE IF NOT EXISTS reminder_log (
+  id SERIAL PRIMARY KEY,
+  quiz_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  sent_at BIGINT NOT NULL,
+  UNIQUE (quiz_id, student_id)
+);
+ALTER TABLE reminder_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
@@ -216,6 +226,10 @@ export interface IStorage {
   addToBank(teacherId: number, question: string, topic: string, difficulty: string): Promise<BankQuestion>;
   getBankQuestion(id: number): Promise<BankQuestion | undefined>;
   deleteBankQuestion(id: number): Promise<void>;
+  // deadlines / reminders
+  getQuizzesDueBetween(from: number, to: number): Promise<Quiz[]>;
+  getReminderKeys(quizIds: number[]): Promise<Set<string>>;
+  logReminder(quizId: number, studentId: number): Promise<boolean>;
   // feedback
   createFeedback(f: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
@@ -406,6 +420,23 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteBankQuestion(id: number) {
     await db.delete(bankQuestions).where(eq(bankQuestions.id, id));
+  }
+
+  // ---- deadlines / reminders ----
+  async getQuizzesDueBetween(from: number, to: number) {
+    return db.select().from(quizzes)
+      .where(and(eq(quizzes.isTemplate, 0), gte(quizzes.dueAt, from), lte(quizzes.dueAt, to)));
+  }
+  async getReminderKeys(quizIds: number[]) {
+    if (!quizIds.length) return new Set<string>();
+    const rows = await db.select().from(reminderLog).where(inArray(reminderLog.quizId, quizIds));
+    return new Set(rows.map((r) => `${r.quizId}:${r.studentId}`));
+  }
+  /** Records a reminder; false if one was already recorded (another run won). */
+  async logReminder(quizId: number, studentId: number) {
+    const rows = await db.insert(reminderLog).values({ quizId, studentId, sentAt: Date.now() })
+      .onConflictDoNothing().returning();
+    return rows.length > 0;
   }
 
   // ---- feedback ----
