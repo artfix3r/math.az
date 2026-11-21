@@ -1,27 +1,39 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
-  materials, materialGroups, passwordResetTokens,
+  materials, materialGroups, passwordResetTokens, bankQuestions, reminderLog, parentLinks,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
   Quiz, InsertQuiz, Submission, InsertSubmission,
   ClassSession, InsertSession, Feedback, InsertFeedback,
-  Material, InsertMaterial, MaterialGroup, PasswordResetToken,
+  Material, InsertMaterial, MaterialGroup, PasswordResetToken, BankQuestion,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lte } from "drizzle-orm";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 
 // disable prepared statements — safe for pgbouncer / Vercel serverless
-const client = postgres(connectionString, { prepare: false });
+const client = postgres(connectionString, { prepare: false, onnotice: () => {} });
 export const db = drizzle(client);
 
-// Auto-create tables on first startup. Exported as a promise so server/index.ts
-// can await it before listening, and api/index.ts can await it per-request.
-export const ready = (async () => {
+// Auto-create / migrate tables. Runs once per process; if the database is
+// unreachable (e.g. a paused or waking Supabase project) the attempt is
+// forgotten so the next request retries instead of the process crashing.
+let schemaPromise: Promise<void> | null = null;
+export function ensureSchema(): Promise<void> {
+  if (!schemaPromise) {
+    schemaPromise = runSchema().catch((e) => {
+      schemaPromise = null;
+      throw e;
+    });
+  }
+  return schemaPromise;
+}
+
+async function runSchema() {
   await client.unsafe(`
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -120,13 +132,62 @@ ALTER TABLE submissions ADD COLUMN IF NOT EXISTS attempt_number INTEGER NOT NULL
 -- Google sign-in + nullable password (Google-only accounts have no local password).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT;
 ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+-- Uploaded materials can live in object storage instead of data_url.
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS storage_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS mime_type TEXT NOT NULL DEFAULT '';
+-- Hosts like Supabase expose the public schema through a web API. The app
+-- connects as the table owner (which bypasses RLS), so enabling RLS with no
+-- policies blocks that API without affecting the app.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+-- Question bank and per-student quiz variants.
+CREATE TABLE IF NOT EXISTS bank_questions (
+  id SERIAL PRIMARY KEY,
+  teacher_id INTEGER NOT NULL,
+  question TEXT NOT NULL,
+  topic TEXT NOT NULL DEFAULT '',
+  difficulty TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS bank_questions_teacher ON bank_questions (teacher_id);
+ALTER TABLE bank_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pick_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS question_ids TEXT NOT NULL DEFAULT '';
+-- Homework deadlines and reminders.
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS due_at BIGINT;
+CREATE TABLE IF NOT EXISTS reminder_log (
+  id SERIAL PRIMARY KEY,
+  quiz_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  sent_at BIGINT NOT NULL,
+  UNIQUE (quiz_id, student_id)
+);
+ALTER TABLE reminder_log ENABLE ROW LEVEL SECURITY;
+-- Parent links (read-only progress links).
+CREATE TABLE IF NOT EXISTS parent_links (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL UNIQUE,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_by INTEGER NOT NULL,
+  created_at BIGINT NOT NULL
+);
+ALTER TABLE parent_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
     ALTER TABLE users ADD CONSTRAINT users_google_id_unique UNIQUE (google_id);
   END IF;
 END $$;
 `);
-})();
+}
 
 export interface IStorage {
   // users
@@ -169,6 +230,20 @@ export interface IStorage {
   getSubmission(quizId: number, studentId: number): Promise<Submission | undefined>;
   getSubmissionById(id: number): Promise<Submission | undefined>;
   deleteSubmission(id: number): Promise<void>;
+  // question bank
+  listBank(teacherId: number, filter: { topic?: string; difficulty?: string }): Promise<BankQuestion[]>;
+  addToBank(teacherId: number, question: string, topic: string, difficulty: string): Promise<BankQuestion>;
+  getBankQuestion(id: number): Promise<BankQuestion | undefined>;
+  deleteBankQuestion(id: number): Promise<void>;
+  // deadlines / reminders
+  getQuizzesDueBetween(from: number, to: number): Promise<Quiz[]>;
+  getReminderKeys(quizIds: number[]): Promise<Set<string>>;
+  logReminder(quizId: number, studentId: number): Promise<boolean>;
+  // parent links
+  setParentLink(studentId: number, tokenHash: string, createdBy: number): Promise<void>;
+  getParentLinkByStudent(studentId: number): Promise<{ createdAt: number } | undefined>;
+  getStudentIdByParentToken(tokenHash: string): Promise<number | undefined>;
+  deleteParentLink(studentId: number): Promise<void>;
   // feedback
   createFeedback(f: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
@@ -183,7 +258,7 @@ export interface IStorage {
   getMaterial(id: number): Promise<Material | undefined>;
   getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
   getMaterialsForStudent(studentId: number): Promise<Material[]>;
-  deleteMaterial(id: number): Promise<void>;
+  deleteMaterial(id: number): Promise<string[]>;
   setMaterialGroups(materialId: number, groupIds: number[]): Promise<void>;
   getMaterialGroups(materialId: number): Promise<MaterialGroup[]>;
 }
@@ -342,6 +417,60 @@ export class DatabaseStorage implements IStorage {
     await db.delete(submissions).where(eq(submissions.id, id));
   }
 
+  // ---- question bank ----
+  async listBank(teacherId: number, filter: { topic?: string; difficulty?: string }) {
+    const conds = [eq(bankQuestions.teacherId, teacherId)];
+    if (filter.topic) conds.push(eq(bankQuestions.topic, filter.topic));
+    if (filter.difficulty) conds.push(eq(bankQuestions.difficulty, filter.difficulty));
+    return db.select().from(bankQuestions).where(and(...conds)).orderBy(desc(bankQuestions.createdAt));
+  }
+  async addToBank(teacherId: number, question: string, topic: string, difficulty: string) {
+    const rows = await db.insert(bankQuestions).values({ teacherId, question, topic, difficulty, createdAt: Date.now() }).returning();
+    return rows[0];
+  }
+  async getBankQuestion(id: number) {
+    const rows = await db.select().from(bankQuestions).where(eq(bankQuestions.id, id));
+    return rows[0];
+  }
+  async deleteBankQuestion(id: number) {
+    await db.delete(bankQuestions).where(eq(bankQuestions.id, id));
+  }
+
+  // ---- deadlines / reminders ----
+  async getQuizzesDueBetween(from: number, to: number) {
+    return db.select().from(quizzes)
+      .where(and(eq(quizzes.isTemplate, 0), gte(quizzes.dueAt, from), lte(quizzes.dueAt, to)));
+  }
+  async getReminderKeys(quizIds: number[]) {
+    if (!quizIds.length) return new Set<string>();
+    const rows = await db.select().from(reminderLog).where(inArray(reminderLog.quizId, quizIds));
+    return new Set(rows.map((r) => `${r.quizId}:${r.studentId}`));
+  }
+  // ---- parent links ----
+  async setParentLink(studentId: number, tokenHash: string, createdBy: number) {
+    // One link per student: replacing it switches the old one off.
+    await db.insert(parentLinks).values({ studentId, tokenHash, createdBy, createdAt: Date.now() })
+      .onConflictDoUpdate({ target: parentLinks.studentId, set: { tokenHash, createdBy, createdAt: Date.now() } });
+  }
+  async getParentLinkByStudent(studentId: number) {
+    const rows = await db.select().from(parentLinks).where(eq(parentLinks.studentId, studentId));
+    return rows[0] ? { createdAt: rows[0].createdAt } : undefined;
+  }
+  async getStudentIdByParentToken(tokenHash: string) {
+    const rows = await db.select().from(parentLinks).where(eq(parentLinks.tokenHash, tokenHash));
+    return rows[0]?.studentId;
+  }
+  async deleteParentLink(studentId: number) {
+    await db.delete(parentLinks).where(eq(parentLinks.studentId, studentId));
+  }
+
+  /** Records a reminder; false if one was already recorded (another run won). */
+  async logReminder(quizId: number, studentId: number) {
+    const rows = await db.insert(reminderLog).values({ quizId, studentId, sentAt: Date.now() })
+      .onConflictDoNothing().returning();
+    return rows.length > 0;
+  }
+
   // ---- feedback ----
   async createFeedback(f: InsertFeedback) {
     const rows = await db.insert(feedback).values({ ...f, createdAt: Date.now() }).returning();
@@ -445,6 +574,9 @@ export class DatabaseStorage implements IStorage {
     const ids = Array.from(toDelete);
     await db.delete(materialGroups).where(inArray(materialGroups.materialId, ids));
     await db.delete(materials).where(inArray(materials.id, ids));
+    // Return the storage objects that belonged to the deleted nodes so the
+    // caller can remove them from the bucket.
+    return all.filter((m) => toDelete.has(m.id) && m.storagePath).map((m) => m.storagePath);
   }
   async setMaterialGroups(materialId: number, groupIds: number[]) {
     await db.delete(materialGroups).where(eq(materialGroups.materialId, materialId));

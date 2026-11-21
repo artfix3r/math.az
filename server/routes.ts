@@ -13,7 +13,17 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
-import { sendResetEmail, isEmailConfigured } from "./mailer";
+import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
+import { remindersToSend, REMINDER_WINDOW_MS } from "@shared/deadlines";
+import { computeProgress } from "@shared/progress";
+import { timingSafeEqual, createHash } from "node:crypto";
+import { readSessionUserId, setSession, clearSession } from "./session";
+import { attachErrorCodes, zodErrorBody } from "./errors";
+import { buildVariant, gradeAnswers, answersToOriginal, variantSeed } from "@shared/quiz-variants";
+import {
+  isStorageEnabled, publicStorageConfig, createUploadUrl, createDownloadUrl,
+  removeFiles, teacherPrefix, MAX_UPLOAD_BYTES,
+} from "./file-storage";
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -49,16 +59,17 @@ function sanitize(u: User) {
   return rest;
 }
 
-// Lightweight auth: client sends x-user-id header. Sandboxed iframe blocks
-// cookies/localStorage, so the client keeps the user in React state and
-// echoes the id with each request.
+// The signed-in user comes only from the signed, httpOnly session cookie
+// (see ./session.ts). Nothing the client sends in headers or the body can
+// choose which user it is.
 async function authUser(req: Request): Promise<User | undefined> {
-  const id = Number(req.header("x-user-id"));
+  const id = readSessionUserId(req);
   if (!id) return undefined;
   return storage.getUser(id);
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  attachErrorCodes(app);
   const requireUser = async (req: Request, res: Response, next: NextFunction) => {
     const user = await authUser(req);
     if (!user) return res.status(401).json({ message: "Not authenticated" });
@@ -71,6 +82,57 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   };
 
+  // ---- Ownership / access helpers ----
+  // Each returns the record when the signed-in user may act on it, otherwise
+  // sends a 404 (so we don't reveal whether someone else's record exists).
+  const notFound = (res: Response, what: string) =>
+    res.status(404).json({ message: `${what} not found` });
+
+  async function ownedGroup(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const g = await storage.getGroup(id);
+    if (!g || g.teacherId !== user.id) { notFound(res, "Group"); return undefined; }
+    return g;
+  }
+  async function ownedQuiz(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const q = await storage.getQuiz(id);
+    if (!q || q.teacherId !== user.id) { notFound(res, "Quiz"); return undefined; }
+    return q;
+  }
+  // A submission is the teacher's if it belongs to one of their quizzes.
+  async function ownedSubmission(req: Request, res: Response, id: number) {
+    const user = (req as any).user as User;
+    const sub = await storage.getSubmissionById(id);
+    const quiz = sub ? await storage.getQuiz(sub.quizId) : undefined;
+    if (!sub || !quiz || quiz.teacherId !== user.id) { notFound(res, "Submission"); return undefined; }
+    return sub;
+  }
+  // Students may see a quiz only if it is live (not a template) and assigned
+  // to a group they belong to.
+  async function studentCanSeeQuiz(user: User, quiz: Quiz) {
+    return quiz.isTemplate === 0 && quiz.groupId != null && (await storage.isMember(quiz.groupId, user.id));
+  }
+  // A teacher may only target their own groups (null = no group).
+  async function groupIsMine(user: User, groupId: unknown) {
+    if (groupId == null || groupId === "") return true;
+    const g = await storage.getGroup(Number(groupId));
+    return !!g && g.teacherId === user.id;
+  }
+  // The questions this student gets (random pick / shuffled), with answers.
+  function studentVariant(quiz: Quiz, studentId: number) {
+    let questions: Question[] = [];
+    try { questions = JSON.parse(quiz.questions || "[]"); } catch { /* keep empty */ }
+    const variant = buildVariant(questions, { pickCount: quiz.pickCount ?? 0, shuffle: !!quiz.shuffle }, variantSeed(quiz.id, studentId));
+    return { questions, variant };
+  }
+  // The student's variant with the answer keys removed.
+  function quizForStudent(quiz: Quiz, studentId: number) {
+    const { variant } = studentVariant(quiz, studentId);
+    const safe = variant.map(({ correctIndex, correctIndexes, correctText, correctNumber, tolerance, optionOrder, ...rest }) => rest);
+    return { ...quiz, questions: JSON.stringify(safe) };
+  }
+
   // ---------------- Auth ----------------
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -81,9 +143,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(409).json({ message: "Username already taken" });
       const hashedPassword = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
       const user = await storage.createUser({ ...data, password: hashedPassword });
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Registration failed" });
     }
   });
@@ -96,6 +159,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         : await storage.getUserByUsername(identifier);
       if (!user || !user.password || !(await bcrypt.compare(password, user.password)))
         return res.status(401).json({ message: "Invalid credentials" });
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
       res.status(400).json({ message: "Login failed" });
@@ -104,6 +168,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/auth/me", requireUser, async (req, res) => {
     res.json(sanitize((req as any).user));
+  });
+
+  app.post("/api/auth/logout", (_req, res) => {
+    clearSession(res);
+    res.json({ ok: true });
   });
 
   // Sign in / sign up with Google. The client sends the Google ID token from
@@ -156,9 +225,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           googleId,
         } as any);
       }
+      setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Google sign-in failed" });
     }
   });
@@ -184,7 +254,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Uniform response regardless of whether the email exists.
       res.json({ ok: true });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Could not process the request" });
     }
   });
@@ -201,7 +271,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await storage.markResetTokenUsed(record.id);
       res.json({ ok: true });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Could not reset password" });
     }
   });
@@ -225,12 +295,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/groups/:id/members", requireUser, async (req, res) => {
-    const members = await storage.getMembers(Number(req.params.id));
+    const user = (req as any).user as User;
+    const gid = Number(req.params.id);
+    if (user.role === "teacher") {
+      if (!(await ownedGroup(req, res, gid))) return;
+    } else if (!(await storage.isMember(gid, user.id))) {
+      return notFound(res, "Group");
+    }
+    const members = await storage.getMembers(gid);
     res.json(members.map(sanitize));
   });
 
   app.post("/api/groups/:id/members", requireUser, requireTeacher, async (req, res) => {
     const gid = Number(req.params.id);
+    if (!(await ownedGroup(req, res, gid))) return;
     const { identifier } = z.object({ identifier: z.string().min(1) }).parse(req.body);
     const student = identifier.includes("@")
       ? await storage.getUserByEmail(identifier)
@@ -244,11 +322,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/groups/:id/members/:studentId", requireUser, requireTeacher, async (req, res) => {
+    if (!(await ownedGroup(req, res, Number(req.params.id)))) return;
     await storage.removeMember(Number(req.params.id), Number(req.params.studentId));
     res.json({ ok: true });
   });
 
   app.delete("/api/groups/:id", requireUser, requireTeacher, async (req, res) => {
+    if (!(await ownedGroup(req, res, Number(req.params.id)))) return;
     await storage.deleteGroup(Number(req.params.id));
     res.json({ ok: true });
   });
@@ -263,7 +343,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const quizzes = await storage.getQuizzesForStudent(user.id);
       const withState = await Promise.all(quizzes.map(async (q) => {
         const sub = await storage.getSubmission(q.id, user.id);
-        return { ...q, submission: sub ? { score: sub.score, maxScore: sub.maxScore, needsGrading: sub.needsGrading } : null };
+        // Never send answer keys to students: use their own variant, stripped.
+        return { ...quizForStudent(q, user.id), submission: sub ? { score: sub.score, maxScore: sub.maxScore, needsGrading: sub.needsGrading } : null };
       }));
       res.json(withState);
     }
@@ -275,9 +356,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/quizzes/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
     const quiz = await storage.getQuiz(Number(req.params.id));
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    res.json(quiz);
+    if (!quiz) return notFound(res, "Quiz");
+    if (user.role === "teacher") {
+      if (quiz.teacherId !== user.id) return notFound(res, "Quiz");
+      return res.json(quiz);
+    }
+    if (!(await studentCanSeeQuiz(user, quiz))) return notFound(res, "Quiz");
+    res.json(quizForStudent(quiz, user.id));
   });
 
   function validateQuestions(raw: string): string {
@@ -289,27 +376,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = (req as any).user as User;
       const body = { ...req.body, teacherId: user.id };
+      if (!(await groupIsMine(user, body.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
       if (body.questions) body.questions = validateQuestions(body.questions);
       const data = insertQuizSchema.parse(body);
       res.json(await storage.createQuiz(data));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create quiz" });
     }
   });
 
   app.patch("/api/quizzes/:id", requireUser, requireTeacher, async (req, res) => {
-    const body = { ...req.body };
-    if (body.questions) body.questions = validateQuestions(body.questions);
-    const updated = await storage.updateQuiz(Number(req.params.id), body);
-    res.json(updated);
+    try {
+      const user = (req as any).user as User;
+      const quiz = await ownedQuiz(req, res, Number(req.params.id));
+      if (!quiz) return;
+      const { id: _id, teacherId: _t, createdAt: _c, ...body } = req.body ?? {};
+      if ("groupId" in body && !(await groupIsMine(user, body.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
+      if (body.questions) body.questions = validateQuestions(body.questions);
+      const updated = await storage.updateQuiz(quiz.id, body);
+      res.json(updated);
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
+      res.status(500).json({ message: "Failed to update quiz" });
+    }
   });
 
   // Save as template (backup)
   app.post("/api/quizzes/:id/save-template", requireUser, requireTeacher, async (req, res) => {
     const user = (req as any).user as User;
-    const src = await storage.getQuiz(Number(req.params.id));
-    if (!src) return res.status(404).json({ message: "Quiz not found" });
+    const src = await ownedQuiz(req, res, Number(req.params.id));
+    if (!src) return;
     const tpl = await storage.createQuiz({
       title: src.title, description: src.description, teacherId: user.id,
       groupId: null, questions: src.questions, durationMinutes: src.durationMinutes,
@@ -321,9 +420,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Reuse a template -> creates a new live quiz copy
   app.post("/api/quizzes/:id/reuse", requireUser, requireTeacher, async (req, res) => {
     const user = (req as any).user as User;
-    const src = await storage.getQuiz(Number(req.params.id));
-    if (!src) return res.status(404).json({ message: "Quiz not found" });
+    const src = await ownedQuiz(req, res, Number(req.params.id));
+    if (!src) return;
     const { groupId, startAt } = req.body;
+    if (!(await groupIsMine(user, groupId)))
+      return res.status(400).json({ message: "That group is not yours" });
     const copy = await storage.createQuiz({
       title: src.title, description: src.description, teacherId: user.id,
       groupId: groupId ?? null, questions: src.questions,
@@ -333,7 +434,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/quizzes/:id", requireUser, requireTeacher, async (req, res) => {
-    await storage.deleteQuiz(Number(req.params.id));
+    const quiz = await ownedQuiz(req, res, Number(req.params.id));
+    if (!quiz) return;
+    await storage.deleteQuiz(quiz.id);
     res.json({ ok: true });
   });
 
@@ -342,7 +445,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/quizzes/:id/submit", requireUser, async (req, res) => {
     const user = (req as any).user as User;
     const quiz = await storage.getQuiz(Number(req.params.id));
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+    if (!quiz || user.role !== "student" || !(await studentCanSeeQuiz(user, quiz)))
+      return notFound(res, "Quiz");
+    if (quiz.dueAt && Date.now() > quiz.dueAt)
+      return res.status(409).json({ message: "The deadline for this quiz has passed" });
     const existing = await storage.getSubmission(quiz.id, user.id);
     // maxAttempts: 0 = unlimited. A teacher "reopen" deletes the prior submission,
     // so a fresh attempt is allowed; otherwise enforce the configured limit.
@@ -351,60 +457,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const attemptNumber = existing ? existing.attemptNumber + 1 : 1;
     const autoSubmitted = req.body.autoSubmitted ? 1 : 0;
 
-    const answers = req.body.answers as Record<string, { answer: string | number }>;
-    const questions: Question[] = JSON.parse(quiz.questions);
-    let score = 0, maxScore = 0, needsGrading = 0;
-    for (const q of questions) {
-      maxScore += q.points;
-      const a = answers[q.id];
-      if (q.type === "mcq" || q.type === "true_false") {
-        // single correct index
-        if (a && a.answer !== "" && a.answer !== undefined && Number(a.answer) === q.correctIndex)
-          score += q.points;
-      } else if (q.type === "multi_select") {
-        // answer is a comma-separated list of selected indexes; exact set match
-        const selected = new Set(
-          a && a.answer !== "" && a.answer !== undefined
-            ? String(a.answer).split(",").filter((x) => x !== "").map((x) => Number(x))
-            : []
-        );
-        const correct = new Set((q.correctIndexes ?? []).map((x) => Number(x)));
-        if (
-          selected.size === correct.size &&
-          Array.from(selected).every((x) => correct.has(x))
-        )
-          score += q.points;
-      } else if (q.type === "fill_blank") {
-        // case-insensitive trimmed match
-        const given = a ? String(a.answer ?? "").trim().toLowerCase() : "";
-        if (given && given === String(q.correctText ?? "").trim().toLowerCase())
-          score += q.points;
-      } else if (q.type === "numeric") {
-        // within tolerance of correctNumber
-        const given = a && a.answer !== "" && a.answer !== undefined ? Number(a.answer) : NaN;
-        const target = q.correctNumber;
-        const tol = q.tolerance ?? 0;
-        if (!Number.isNaN(given) && target !== undefined && Math.abs(given - target) <= tol)
-          score += q.points;
-      } else {
-        // open / photo -> manual grading
-        if (a && String(a.answer ?? "").trim()) needsGrading = 1;
-      }
-    }
+    const answers = (req.body.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, { answer: string | number }>;
+    // Grade against this student's variant, then store answers in the
+    // original option order so results pages read them directly.
+    const { questions, variant } = studentVariant(quiz, user.id);
+    const { score, maxScore, needsGrading } = gradeAnswers(variant, answers);
+    const stored = answersToOriginal(questions, variant, answers);
+    const questionIds = variant.length === questions.length ? "" : JSON.stringify(variant.map((q) => q.id));
     // If a prior attempt exists (e.g. teacher reopened with higher maxAttempts),
     // replace it so the latest attempt is the one of record.
     if (existing) await storage.deleteSubmission(existing.id);
     const sub = await storage.createSubmission({
-      quizId: quiz.id, studentId: user.id, answers: JSON.stringify(answers),
-      score, maxScore, needsGrading, autoSubmitted, attemptNumber, submittedAt: Date.now(),
+      quizId: quiz.id, studentId: user.id, answers: JSON.stringify(stored),
+      score, maxScore, needsGrading, autoSubmitted, attemptNumber, questionIds, submittedAt: Date.now(),
     });
     res.json(sub);
   });
 
   // Teacher grades open/photo questions
   app.patch("/api/submissions/:id/grade", requireUser, requireTeacher, async (req, res) => {
+    const sub = await ownedSubmission(req, res, Number(req.params.id));
+    if (!sub) return;
     const { score, needsGrading, gradedPoints } = req.body;
-    const updated = await storage.updateSubmission(Number(req.params.id), {
+    const updated = await storage.updateSubmission(sub.id, {
       score, needsGrading: needsGrading ? 1 : 0,
       gradedPoints: typeof gradedPoints === "string" ? gradedPoints : JSON.stringify(gradedPoints ?? {}),
     });
@@ -412,7 +487,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/quizzes/:id/submissions", requireUser, requireTeacher, async (req, res) => {
-    const subs = await storage.getSubmissionsByQuiz(Number(req.params.id));
+    const quiz = await ownedQuiz(req, res, Number(req.params.id));
+    if (!quiz) return;
+    const subs = await storage.getSubmissionsByQuiz(quiz.id);
     const withNames = await Promise.all(subs.map(async (s) => {
       const student = await storage.getUser(s.studentId);
       return { ...s, studentName: student?.fullName, studentEmail: student?.email };
@@ -498,16 +575,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/sessions", requireUser, requireTeacher, async (req, res) => {
     try {
       const user = (req as any).user as User;
+      if (!(await groupIsMine(user, req.body?.groupId)))
+        return res.status(400).json({ message: "That group is not yours" });
       const data = insertSessionSchema.parse({ ...req.body, teacherId: user.id });
       res.json(await storage.createSession(data));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create session" });
     }
   });
 
   app.delete("/api/sessions/:id", requireUser, requireTeacher, async (req, res) => {
-    await storage.deleteSession(Number(req.params.id));
+    const user = (req as any).user as User;
+    const id = Number(req.params.id);
+    const mine = await storage.getSessionsByTeacher(user.id);
+    if (!mine.some((s) => s.id === id)) return notFound(res, "Session");
+    await storage.deleteSession(id);
     res.json({ ok: true });
   });
 
@@ -520,8 +603,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Teacher reopens / resets a student's attempt by removing the submission so
   // the student can take the quiz again (works during or after a quiz).
   app.delete("/api/submissions/:id", requireUser, requireTeacher, async (req, res) => {
-    const sub = await storage.getSubmissionById(Number(req.params.id));
-    if (!sub) return res.status(404).json({ message: "Submission not found" });
+    const sub = await ownedSubmission(req, res, Number(req.params.id));
+    if (!sub) return;
     await storage.deleteSubmission(sub.id);
     res.json({ ok: true });
   });
@@ -553,13 +636,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       res.json({ ok: true, id: saved.id });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
 
-  // Teacher can review all submitted feedback in-app.
-  app.get("/api/feedback", requireUser, requireTeacher, async (_req, res) => {
+  // Only site admins (emails listed in ADMIN_EMAILS, comma-separated) can read
+  // feedback, because it contains visitors' names and email addresses.
+  const ADMIN_EMAILS = new Set(
+    (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
+  );
+  app.get("/api/feedback", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    if (!ADMIN_EMAILS.has(user.email.toLowerCase())) return res.status(403).json({ message: "Admins only" });
     res.json(await storage.getAllFeedback());
   });
 
@@ -569,10 +658,94 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Each file is public (all of the teacher's students) or private (only the
   // groups the teacher selects).
 
+  // Never send file contents in list responses (they used to include the whole
+  // base64 file). Clients open files through /api/materials/:id/file instead.
+  const publicMaterial = (m: any) => {
+    const { dataUrl, storagePath, ...rest } = m;
+    return { ...rest, dataUrl: "", hasFile: !!(dataUrl || storagePath) };
+  };
   // Attach the group ids a private material is shared with.
   const withGroupIds = async (m: any) => ({
-    ...m,
+    ...publicMaterial(m),
     groupIds: (await storage.getMaterialGroups(m.id)).map((g) => g.groupId),
+  });
+
+  // Validate the file fields of a create/update body. Returns an error message
+  // or null. Mutates `data` so exactly one of storagePath / dataUrl is used.
+  function checkFileFields(user: User, data: any): string | null {
+    if (data.linkUrl && !/^https?:\/\//i.test(String(data.linkUrl)))
+      return "Links must start with http:// or https://";
+    if (data.storagePath) {
+      if (!isStorageEnabled()) return "File storage is not configured";
+      if (!String(data.storagePath).startsWith(teacherPrefix(user.id)) || String(data.storagePath).includes(".."))
+        return "Invalid file";
+      data.dataUrl = "";
+    } else if (data.dataUrl) {
+      // Legacy path: file embedded in the database. Only when storage is off.
+      if (isStorageEnabled()) return "Upload the file to storage first";
+      if (!/^data:[\w.+-]+\/[\w.+-]+;base64,/.test(String(data.dataUrl))) return "Invalid file";
+    }
+    return null;
+  }
+
+  // Can this user open this material's file?
+  async function canOpenMaterial(user: User, m: any) {
+    if (m.kind !== "file") return false;
+    if (user.role === "teacher") return m.teacherId === user.id;
+    const visible = await storage.getMaterialsForStudent(user.id);
+    return visible.some((v) => v.id === m.id);
+  }
+
+  // Browser needs this to decide how to upload.
+  app.get("/api/storage/config", requireUser, (_req, res) => {
+    res.json(publicStorageConfig());
+  });
+
+  // Step 1 of an upload: get a one-time signed URL to upload straight to storage.
+  app.post("/api/materials/upload-url", requireUser, requireTeacher, async (req, res) => {
+    try {
+      if (!isStorageEnabled()) return res.status(503).json({ message: "File storage is not configured" });
+      const user = (req as any).user as User;
+      const { fileName, sizeBytes } = z
+        .object({ fileName: z.string().min(1).max(300), sizeBytes: z.number().int().nonnegative() })
+        .parse(req.body);
+      if (sizeBytes > MAX_UPLOAD_BYTES)
+        return res.status(413).json({ message: `Files can be at most ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB` });
+      res.json(await createUploadUrl(user.id, fileName));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
+      console.error("upload-url failed", e);
+      res.status(500).json({ message: "Could not start the upload" });
+    }
+  });
+
+  // Open / download a material's file after an access check.
+  app.get("/api/materials/:id/file", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const m = await storage.getMaterial(Number(req.params.id));
+    if (!m || !(await canOpenMaterial(user, m))) return notFound(res, "Material");
+    const download = req.query.download === "1";
+    res.setHeader("Cache-Control", "private, no-store");
+    if (m.storagePath) {
+      try {
+        return res.redirect(302, await createDownloadUrl(m.storagePath, download ? m.name : undefined));
+      } catch (e) {
+        console.error("download url failed", e);
+        return res.status(502).json({ message: "Could not open the file" });
+      }
+    }
+    const match = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(m.dataUrl || "");
+    if (!match) return notFound(res, "File");
+    const body = match[2] ? Buffer.from(match[3], "base64") : Buffer.from(decodeURIComponent(match[3]));
+    res.setHeader("Content-Type", match[1]);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Uploaded HTML/SVG must not run scripts on our origin.
+    res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'; img-src data:; media-src data:; style-src 'unsafe-inline'");
+    res.setHeader(
+      "Content-Disposition",
+      `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(m.name)}`,
+    );
+    res.send(body);
   });
 
   // GET: teacher sees their full tree; student sees only accessible items.
@@ -584,7 +757,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } else {
       const items = await storage.getMaterialsForStudent(user.id);
       // Strip group sharing details for students.
-      res.json(items);
+      res.json(items.map(publicMaterial));
     }
   });
 
@@ -595,6 +768,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ? (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n))
         : [];
       const data = insertMaterialSchema.parse({ ...req.body, teacherId: user.id });
+      const fileErr = checkFileFields(user, data);
+      if (fileErr) return res.status(400).json({ message: fileErr });
       // Validate parent belongs to this teacher and is a folder.
       if (data.parentId != null) {
         const parent = await storage.getMaterial(data.parentId);
@@ -613,7 +788,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         await storage.setMaterialGroups(created.id, groupIds);
       res.json(await withGroupIds(created));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create material" });
     }
   });
@@ -628,19 +803,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const patch = insertMaterialSchema.partial().parse(req.body);
       // Don't allow reassigning ownership.
       delete (patch as any).teacherId;
-      const updated = await storage.updateMaterial(id, patch);
-      // Update group sharing if provided.
+      const fileErr = checkFileFields(user, patch);
+      if (fileErr) return res.status(400).json({ message: fileErr });
+      // A new upload replaces the old file entirely.
+      const replacingFile = !!(patch.storagePath || patch.dataUrl);
+      if (replacingFile) {
+        if (!patch.storagePath) (patch as any).storagePath = "";
+        if (!patch.dataUrl) (patch as any).dataUrl = "";
+      }
+      if (patch.parentId != null) {
+        const parent = await storage.getMaterial(patch.parentId);
+        if (!parent || parent.teacherId !== user.id || parent.kind !== "folder" || parent.id === id)
+          return res.status(400).json({ message: "Invalid parent folder" });
+      }
+      // Validate group sharing before changing anything.
+      let groupIds: number[] | null = null;
       if (Array.isArray(req.body.groupIds)) {
-        const groupIds = (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
+        groupIds = (req.body.groupIds as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
         const teacherGroups = await storage.getGroupsByTeacher(user.id);
         const owned = new Set(teacherGroups.map((g) => g.id));
         if (!groupIds.every((g) => owned.has(g)))
           return res.status(400).json({ message: "One or more groups are not yours" });
-        await storage.setMaterialGroups(id, groupIds);
       }
+      const updated = await storage.updateMaterial(id, patch);
+      if (groupIds) await storage.setMaterialGroups(id, groupIds);
+      if (replacingFile && existing.storagePath && existing.storagePath !== patch.storagePath)
+        await removeFiles([existing.storagePath]);
       res.json(await withGroupIds(updated));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to update material" });
     }
   });
@@ -651,7 +842,165 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const existing = await storage.getMaterial(id);
     if (!existing || existing.teacherId !== user.id)
       return res.status(404).json({ message: "Material not found" });
-    await storage.deleteMaterial(id);
+    const paths = await storage.deleteMaterial(id);
+    await removeFiles(paths);
+    res.json({ ok: true });
+  });
+
+  // ---- Progress (scores over time, strengths by topic) ----
+  // onlyTeacherId limits it to that teacher's quizzes (a student can be in
+  // several teachers' groups; each teacher sees only their own quizzes).
+  async function progressFor(studentId: number, onlyTeacherId?: number) {
+    const subs = await storage.getSubmissionsByStudent(studentId);
+    const quizzes: Quiz[] = [];
+    for (const id of Array.from(new Set(subs.map((s) => s.quizId)))) {
+      const q = await storage.getQuiz(id);
+      if (q && (onlyTeacherId === undefined || q.teacherId === onlyTeacherId)) quizzes.push(q);
+    }
+    return computeProgress(quizzes, subs);
+  }
+  // Is this student in one of this teacher's groups?
+  async function teachesStudent(teacherId: number, studentId: number) {
+    for (const g of await storage.getGroupsByTeacher(teacherId)) if (await storage.isMember(g.id, studentId)) return true;
+    return false;
+  }
+
+  app.get("/api/progress", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    res.json(await progressFor(user.id));
+  });
+
+  app.get("/api/students/:id/progress", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const student = await storage.getUser(Number(req.params.id));
+    if (!student || student.role !== "student" || !(await teachesStudent(user.id, student.id)))
+      return notFound(res, "Student");
+    res.json({ student: { id: student.id, fullName: student.fullName }, ...(await progressFor(student.id, user.id)) });
+  });
+
+  // ---- Parent links: read-only progress for a parent, no sign-in ----
+  const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+  async function newParentLink(studentId: number, createdBy: number) {
+    const token = randomBytes(32).toString("base64url");
+    await storage.setParentLink(studentId, hashToken(token), createdBy);
+    return { token, url: `${APP_BASE_URL}/#/parent/${token}` };
+  }
+  const requireStudent = (req: Request, res: Response, next: NextFunction) =>
+    ((req as any).user as User).role === "student" ? next() : res.status(403).json({ message: "Students only" });
+
+  app.get("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    const link = await storage.getParentLinkByStudent(((req as any).user as User).id);
+    res.json(link ? { active: true, createdAt: link.createdAt } : { active: false });
+  });
+  app.post("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    const user = (req as any).user as User;
+    res.json(await newParentLink(user.id, user.id));
+  });
+  app.delete("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    await storage.deleteParentLink(((req as any).user as User).id);
+    res.json({ ok: true });
+  });
+  app.post("/api/students/:id/parent-link", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const student = await storage.getUser(Number(req.params.id));
+    if (!student || student.role !== "student" || !(await teachesStudent(user.id, student.id)))
+      return notFound(res, "Student");
+    res.json(await newParentLink(student.id, user.id));
+  });
+  // Public: anyone with the link. Shows the child's name and progress only.
+  app.get("/api/parent/:token", async (req, res) => {
+    const token = String(req.params.token || "");
+    const studentId = token.length >= 40 ? await storage.getStudentIdByParentToken(hashToken(token)) : undefined;
+    const student = studentId ? await storage.getUser(studentId) : undefined;
+    if (!student) return notFound(res, "Link");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.json({ student: { fullName: student.fullName }, ...(await progressFor(student.id)) });
+  });
+
+  // ---- Homework reminders ----
+  // Called every hour by a scheduled job (Supabase pg_cron) with
+  // "Authorization: Bearer $CRON_SECRET". Emails students whose homework is
+  // due within 24 hours and who haven't submitted, once per quiz.
+  app.post("/api/cron/reminders", async (req, res) => {
+    const secret = process.env.CRON_SECRET || "";
+    const given = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const ok = secret.length >= 8 && given.length === secret.length &&
+      timingSafeEqual(Buffer.from(given), Buffer.from(secret));
+    if (!ok) return res.status(401).json({ message: "Not authenticated" });
+
+    const now = Date.now();
+    const quizzes = await storage.getQuizzesDueBetween(now, now + REMINDER_WINDOW_MS);
+    const members: Record<number, number[]> = {};
+    const users = new Map<number, User>();
+    const submitted = new Set<string>();
+    for (const q of quizzes) {
+      if (q.groupId && !members[q.groupId]) {
+        const m = await storage.getMembers(q.groupId);
+        members[q.groupId] = m.map((u) => u.id);
+        m.forEach((u) => users.set(u.id, u));
+      }
+      for (const s of await storage.getSubmissionsByQuiz(q.id)) submitted.add(`${q.id}:${s.studentId}`);
+    }
+    const alreadySent = await storage.getReminderKeys(quizzes.map((q) => q.id));
+    const due = remindersToSend({ now, quizzes, members, submitted, alreadySent });
+
+    let emailed = 0;
+    const reminders: { quizId: number; studentId: number }[] = [];
+    for (const r of due) {
+      // Record first, so an overlapping run can't email the same student twice.
+      if (!(await storage.logReminder(r.quizId, r.studentId))) continue;
+      reminders.push({ quizId: r.quizId, studentId: r.studentId });
+      const student = users.get(r.studentId);
+      if (student?.email && isEmailConfigured()) {
+        try {
+          await sendReminderEmail(student.email, student.fullName, r.title, r.dueAt, `${APP_BASE_URL}/#/quizzes/${r.quizId}/take`);
+          emailed++;
+        } catch (e) {
+          console.error("reminder email failed", e);
+        }
+      }
+    }
+    res.json({ reminders, emailed });
+  });
+
+  // ---- Question bank (teachers only, each teacher sees only their own) ----
+  app.get("/api/bank", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const topic = typeof req.query.topic === "string" ? req.query.topic : "";
+    const difficulty = typeof req.query.difficulty === "string" ? req.query.difficulty : "";
+    res.json(await storage.listBank(user.id, { topic, difficulty }));
+  });
+
+  app.get("/api/bank/topics", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    // Topics from the bank and from the teacher's quizzes, for suggestions.
+    const topics = new Set<string>();
+    for (const b of await storage.listBank(user.id, {})) if (b.topic) topics.add(b.topic);
+    for (const quiz of await storage.getQuizzesByTeacher(user.id)) {
+      try {
+        for (const q of JSON.parse(quiz.questions || "[]") as Question[]) if (q.topic) topics.add(q.topic);
+      } catch { /* ignore bad JSON */ }
+    }
+    res.json(Array.from(topics).sort((a, b) => a.localeCompare(b, "az")));
+  });
+
+  app.post("/api/bank", requireUser, requireTeacher, async (req, res) => {
+    try {
+      const user = (req as any).user as User;
+      const question = questionSchema.parse(req.body?.question);
+      res.json(await storage.addToBank(user.id, JSON.stringify(question), question.topic ?? "", question.difficulty ?? ""));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
+      res.status(500).json({ message: "Could not process the request" });
+    }
+  });
+
+  app.delete("/api/bank/:id", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const b = await storage.getBankQuestion(Number(req.params.id));
+    if (!b || b.teacherId !== user.id) return notFound(res, "Question");
+    await storage.deleteBankQuestion(b.id);
     res.json({ ok: true });
   });
 

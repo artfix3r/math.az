@@ -314,3 +314,16 @@
     inset: -1px;
   }
 }
+
+/* Formulas in question text (client/src/lib/math.ts) */
+.math-text .katex { font-size: 1.08em; }
+.math-text .katex-display { margin: 0.4em 0; overflow-x: auto; overflow-y: hidden; }
+.math-text .math-error { color: hsl(var(--destructive)); font-size: 0.9em; }
+
+/* Printing a quiz (pages/print-quiz.tsx) */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  .no-print { display: none !important; }
+  html, body { background: #fff !important; }
+  .print-page .answer-key { break-before: page; }
+}

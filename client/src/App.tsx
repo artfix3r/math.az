@@ -24,6 +24,9 @@ import MyResults from "@/pages/my-results";
 import Feedback from "@/pages/feedback";
 import ResetPassword from "@/pages/reset-password";
 import { AppShell } from "@/pages/shell";
+import PrintQuiz from "@/pages/print-quiz";
+import { MyProgress, StudentProgress } from "@/pages/progress";
+import ParentView from "@/pages/parent-view";
 import { Loader2 } from "lucide-react";
 
 function ThemeInit() {
@@ -34,7 +37,7 @@ function ThemeInit() {
   return null;
 }
 
-function Protected({ children }: { children: React.ReactNode }) {
+function Protected({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
   const { user, loading } = useAuth();
   const [, navigate] = useLocation();
   useEffect(() => {
@@ -50,7 +53,7 @@ function Protected({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return null;
-  return <AppShell>{children}</AppShell>;
+  return bare ? <>{children}</> : <AppShell>{children}</AppShell>;
 }
 
 function AppRouter() {
@@ -64,13 +67,17 @@ function AppRouter() {
       <Route path="/quizzes/new">{() => <Protected><QuizBuilder /></Protected>}</Route>
       <Route path="/quizzes/:id/edit">{(p) => <Protected><QuizBuilder id={Number(p.id)} /></Protected>}</Route>
       <Route path="/quizzes/:id/results">{(p) => <Protected><QuizResults id={Number(p.id)} /></Protected>}</Route>
+      <Route path="/quizzes/:id/print">{(p) => <Protected bare><PrintQuiz id={Number(p.id)} /></Protected>}</Route>
       <Route path="/quizzes/:id/take">{(p) => <Protected><TakeQuiz id={Number(p.id)} /></Protected>}</Route>
       <Route path="/library">{() => <Protected><Library /></Protected>}</Route>
       <Route path="/materials">{() => <Protected><Materials /></Protected>}</Route>
       <Route path="/analytics">{() => <Protected><Analytics /></Protected>}</Route>
       <Route path="/sessions">{() => <Protected><Sessions /></Protected>}</Route>
+      <Route path="/progress">{() => <Protected><MyProgress /></Protected>}</Route>
+      <Route path="/students/:id/progress">{(p) => <Protected><StudentProgress id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
       <Route path="/feedback" component={Feedback} />
+      <Route path="/parent/:token">{(p) => <ParentView token={p.token} />}</Route>
       <Route path="/reset-password/:token">{(p) => <ResetPassword token={p.token} />}</Route>
       <Route path="/reset-password">{() => <ResetPassword token="" />}</Route>
       <Route component={NotFound} />

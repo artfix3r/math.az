@@ -120,6 +120,12 @@ export const quizzes = pgTable("quizzes", {
   maxAttempts: integer("max_attempts").notNull().default(1), // 0 = unlimited
   startAt: ts("start_at"), // epoch ms; null for templates
   isTemplate: integer("is_template").notNull().default(0), // 1 = library/backup item
+  // Per-student variants (shared/quiz-variants.ts): give each student this many
+  // random questions (0 = all) and/or shuffle question and option order.
+  pickCount: integer("pick_count").notNull().default(0),
+  // Homework deadline (epoch ms). After it, students can no longer submit.
+  dueAt: ts("due_at"),
+  shuffle: integer("shuffle").notNull().default(0),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -143,6 +149,9 @@ export const questionSchema = z.object({
   correctNumber: z.number().optional(),
   tolerance: z.number().optional().default(0),
   points: z.number().default(1),
+  // Used by the question bank and the progress page.
+  topic: z.string().max(80).optional().default(""),
+  difficulty: z.enum(["", "easy", "medium", "hard"]).optional().default(""),
 });
 
 export const insertQuizSchema = createInsertSchema(quizzes)
@@ -171,6 +180,8 @@ export const submissions = pgTable("submissions", {
   // 1 if the quiz was auto-submitted (e.g. student switched tabs). Shown to teacher.
   autoSubmitted: integer("auto_submitted").notNull().default(0),
   attemptNumber: integer("attempt_number").notNull().default(1),
+  // JSON array of the question ids this student was shown ("" = all of them).
+  questionIds: text("question_ids").notNull().default(""),
   submittedAt: ts("submitted_at").notNull(),
 });
 
@@ -238,6 +249,11 @@ export const materials = pgTable("materials", {
   fileType: text("file_type").notNull().default("other"), // for files only
   // For uploaded files: a base64 data URI (data:<mime>;base64,....). Empty for folders/links.
   dataUrl: text("data_url").notNull().default(""),
+  // For files kept in object storage (Supabase): the object path in the bucket.
+  // When set, dataUrl is empty and the file is served via a signed link.
+  storagePath: text("storage_path").notNull().default(""),
+  // MIME type of an uploaded file (e.g. "application/pdf"). Empty if unknown.
+  mimeType: text("mime_type").notNull().default(""),
   // For YouTube / external links. Empty for folders / uploaded files.
   linkUrl: text("link_url").notNull().default(""),
   // Original size in bytes (uploaded files) for display. 0 for folders/links.
@@ -270,3 +286,35 @@ export const materialGroups = pgTable("material_groups", {
 
 export const insertMaterialGroupSchema = createInsertSchema(materialGroups).omit({ id: true });
 export type MaterialGroup = typeof materialGroups.$inferSelect;
+
+// ---------------- Question bank ----------------
+// A teacher's saved questions, reusable across quizzes. `question` is the
+// question JSON (questionSchema); topic/difficulty are copied out for filtering.
+export const bankQuestions = pgTable("bank_questions", {
+  id: serial("id").primaryKey(),
+  teacherId: integer("teacher_id").notNull(),
+  question: text("question").notNull(),
+  topic: text("topic").notNull().default(""),
+  difficulty: text("difficulty").notNull().default(""),
+  createdAt: ts("created_at").notNull(),
+});
+export type BankQuestion = typeof bankQuestions.$inferSelect;
+
+// One row per reminder email sent, so a student is reminded once per quiz.
+export const reminderLog = pgTable("reminder_log", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quiz_id").notNull(),
+  studentId: integer("student_id").notNull(),
+  sentAt: ts("sent_at").notNull(),
+});
+
+// Read-only link a parent can open to see a student's progress. Only a
+// SHA-256 hash of the token is stored. One active link per student.
+export const parentLinks = pgTable("parent_links", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+export type ParentLink = typeof parentLinks.$inferSelect;

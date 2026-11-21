@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard, Users, FileQuestion, Library, BarChart3,
-  Video, Trophy, LogOut, Moon, Sun, Menu, Globe, MessageSquareHeart, FolderOpen,
-} from "lucide-react";
+  Video, Trophy, LogOut, Moon, Sun, Menu, Globe, MessageSquareHeart, FolderOpen, TrendingUp } from "lucide-react";
 
 type NavItem = { href: string; key: string; icon: React.ElementType };
 
@@ -32,6 +31,7 @@ const STUDENT_NAV: NavItem[] = [
   { href: "/materials", key: "nav.materials", icon: FolderOpen },
   { href: "/sessions", key: "nav.sessions", icon: Video },
   { href: "/results", key: "nav.results", icon: Trophy },
+  { href: "/progress", key: "nav.progress", icon: TrendingUp },
   { href: "/feedback", key: "nav.feedback", icon: MessageSquareHeart },
 ];
 

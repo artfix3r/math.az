@@ -430,13 +430,177 @@ const en: Dict = {
   "mat.replaceFile": "Replace file (optional)",
   "mat.keepFile": "Leave empty to keep the current file.",
   "mat.currentFile": "Current: {name}",
-  "mat.tooBig": "File is too large. Please keep files under 50 MB.",
+  "mat.tooBig": "File is too large.",
+  "mat.uploading": "Uploading…",
   "mat.fileRequired": "Please choose a file.",
   "mat.urlRequired": "Please enter a URL.",
   "mat.badge.public": "Public",
   "mat.badge.private": "Private",
   "mat.folder": "Folder",
-  "mat.uploadFailed": "Could not read that file.",
+  "mat.uploadFailed": "Could not upload that file.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Something went wrong. Please try again.",
+  "err.network": "Could not reach the server. Check your internet connection and try again.",
+  "err.not_authenticated": "Please sign in to continue.",
+  "err.teachers_only": "Only teachers can do this.",
+  "err.admins_only": "Only site admins can do this.",
+  "err.invalid_credentials": "Wrong email/username or password.",
+  "err.login_failed": "Could not sign in. Please try again.",
+  "err.registration_failed": "Could not create the account. Please try again.",
+  "err.email_taken": "An account with this email already exists.",
+  "err.username_taken": "This username is already taken.",
+  "err.google_email_unverified": "Your Google email address is not verified.",
+  "err.google_failed": "Google sign-in failed. Please try again.",
+  "err.google_not_configured": "Google sign-in is not available right now.",
+  "err.email_not_configured": "Sending email is not available right now.",
+  "err.reset_email_failed": "Could not send the reset email. Please try again.",
+  "err.reset_link_invalid": "This reset link is invalid or has expired.",
+  "err.reset_failed": "Could not reset the password. Please try again.",
+  "err.group_not_yours": "You can only use your own groups.",
+  "err.student_not_found": "No student found with that email or username.",
+  "err.not_a_student": "That account is not a student.",
+  "err.already_in_group": "This student is already in the group.",
+  "err.no_attempts_left": "You have used all attempts for this quiz.",
+  "err.save_failed": "Could not save. Please try again.",
+  "err.invalid_folder": "Choose a valid folder.",
+  "err.not_found": "It was not found, or you don't have access to it.",
+  "err.storage_not_configured": "File uploads are not available right now.",
+  "err.upload_failed": "Could not upload the file. Please try again.",
+  "err.file_open_failed": "Could not open the file. Please try again.",
+  "err.file_too_large": "The file is too large. The limit is {max} MB.",
+  "err.invalid_url": "Enter a valid link starting with http:// or https://.",
+  "err.db_unavailable": "The site is temporarily unavailable. Please try again in a minute.",
+  "err.password_too_short": "The password must be at least 8 characters.",
+  "err.password_needs_special": "The password needs at least one special character (for example ! or #).",
+  "err.invalid_email": "Enter a valid email address.",
+  "err.username_too_short": "The username must be at least 2 characters.",
+  "err.field_required": "Please fill in: {field}.",
+  "err.invalid_field": "Please check: {field}.",
+  "field.email": "Email",
+  "field.username": "Username",
+  "field.password": "Password",
+  "field.fullName": "Full name",
+  "field.identifier": "Email or username",
+  "field.title": "Title",
+  "field.meetingUrl": "Meeting link",
+  "field.name": "Name",
+  "field.prompt": "Question text",
+  "field.message": "Message",
+  "field.questions": "Questions",
+  "field.startAt": "Start time",
+  "field.durationMinutes": "Duration",
+  "field.groupId": "Group",
+  "field.options": "Answer options",
+  "field.unknown": "one of the fields",
+  // --- Math formulas ---
+  "math.toolbar": "Formula tools",
+  "math.preview": "Preview",
+  "math.hint": "Tip: write formulas between $ signs, e.g. $\\frac{1}{2}$ or $x^2$, or use the buttons above.",
+  "math.fraction": "Fraction",
+  "math.power": "Power",
+  "math.sqrt": "Square root",
+  "math.root": "n-th root",
+  "math.index": "Subscript",
+  "math.pi": "Pi",
+  "math.le": "Less than or equal",
+  "math.ge": "Greater than or equal",
+  "math.ne": "Not equal",
+  "math.pm": "Plus-minus",
+  "math.dot": "Multiplication dot",
+  "math.degree": "Degrees",
+  "math.angle": "Angle",
+  "math.abs": "Absolute value",
+  "math.log": "Logarithm",
+  "math.sin": "Sine",
+  "math.integral": "Integral",
+  "math.sum": "Sum",
+  // --- Printing ---
+  "print.button": "Print",
+  "print.back": "Back to quizzes",
+  "print.includeKey": "Include answer key",
+  "print.print": "Print / Save as PDF",
+  "print.hint": "In the print window, choose \"Save as PDF\" as the printer to get a PDF file. The answer key prints on its own page.",
+  "print.name": "Name",
+  "print.class": "Class",
+  "print.date": "Date",
+  "print.summary": "{count} questions · {points} points · {minutes} min",
+  "print.points": "{n} pt",
+  "print.keyTitle": "Answer key: {title}",
+  // --- Question bank / variants ---
+  "bank.saveToBank": "Save to bank",
+  "bank.saved": "Saved to your question bank",
+  "bank.saveFailed": "Could not save to the bank",
+  "bank.topicPlaceholder": "Topic, e.g. Fractions",
+  "bank.noDifficulty": "Difficulty…",
+  "bank.easy": "Easy",
+  "bank.medium": "Medium",
+  "bank.hard": "Hard",
+  "bank.addFromBank": "Add from bank",
+  "bank.title": "Question bank",
+  "bank.description": "Your saved questions. Pick the ones to add to this quiz.",
+  "bank.allTopics": "All topics",
+  "bank.allDifficulties": "All difficulties",
+  "bank.empty": "No questions here yet. Use “Save to bank” on any question to keep it for later.",
+  "bank.delete": "Delete from bank",
+  "bank.addSelected": "Add {n} selected",
+  "variant.pickCount": "Random questions per student",
+  "variant.pickHint": "Each student gets this many questions picked at random from the {total} below. 0 = everyone gets all of them.",
+  "variant.shuffle": "Shuffle questions and answers",
+  "variant.shuffleHint": "Each student sees a different order, so neighbours can't copy.",
+  // --- Deadlines ---
+  "due.label": "Due date (homework)",
+  "due.hint": "Leave the due date empty for no deadline; after it, students can't submit.",
+  "due.by": "Due {date}",
+  "due.passed": "Deadline passed ({date})",
+  "due.closedButton": "Deadline passed",
+  "due.bannerTitle": "Homework due within 24 hours: {n}",
+  "err.deadline_passed": "The deadline for this quiz has passed.",
+  // --- Progress ---
+  "nav.progress": "My progress",
+  "prog.title": "My progress",
+  "prog.sub": "How your scores change over time and which topics need more practice.",
+  "prog.teacherSub": "Progress on your quizzes.",
+  "prog.back": "Back",
+  "prog.empty": "No finished quizzes yet. Results will appear here after the first quiz.",
+  "prog.average": "Average score",
+  "prog.quizzesDone": "Quizzes done",
+  "prog.needsWork": "Needs more practice",
+  "prog.nothingWeak": "Nothing — well done!",
+  "prog.chartTitle": "Score per quiz",
+  "prog.pendingNote": "{n} quiz(zes) still being graded by the teacher; their score may go up.",
+  "prog.score": "Score",
+  "prog.showTable": "Show as table",
+  "prog.hideTable": "Hide table",
+  "prog.colQuiz": "Quiz",
+  "prog.colDate": "Date",
+  "prog.topicsTitle": "Topics",
+  "prog.topicsHint": "Weakest first. Written answers count once the teacher has graded them.",
+  "prog.noTopic": "No topic",
+  "prog.level.strong": "Strong",
+  "prog.level.ok": "Okay",
+  "prog.level.weak": "Needs work",
+  "prog.trend.up": "Improving",
+  "prog.trend.down": "Slipping",
+  "prog.trend.steady": "Steady",
+  // --- Parent links ---
+  "err.students_only": "Only students can do this.",
+  "parent.title": "Share with a parent",
+  "parent.desc": "Create a private link so a parent can see this progress page without signing in. They can't change anything.",
+  "parent.create": "Create parent link",
+  "parent.newLink": "Make a new link",
+  "parent.newLinkHint": "Making a new link switches the old one off.",
+  "parent.copy": "Copy",
+  "parent.copied": "Link copied",
+  "parent.onlyOnce": "Copy it now: for safety, the full link is only shown once.",
+  "parent.activeSince": "A parent link is active (made {date}).",
+  "parent.turnOff": "Switch link off",
+  "parent.turnedOff": "Parent link switched off",
+  "parent.failed": "Could not create the link",
+  "parent.invalidTitle": "This link doesn't work",
+  "parent.invalidDesc": "It may have been switched off or replaced with a new one. Ask for a new link.",
+  "parent.viewLabel": "Progress report",
+  "parent.viewSub": "Read-only view shared with you from math.az.",
 };
 
 const az: Dict = {
@@ -843,13 +1007,177 @@ const az: Dict = {
   "mat.replaceFile": "Faylı dəyiş (ixtiyari)",
   "mat.keepFile": "Mövcud faylı saxlamaq üçün boş buraxın.",
   "mat.currentFile": "Hazırkı: {name}",
-  "mat.tooBig": "Fayl çox böyükdür. Zəhmət olmasa 50 MB-dan kiçik fayllar seçin.",
+  "mat.tooBig": "Fayl çox böyükdür.",
+  "mat.uploading": "Yüklənir…",
   "mat.fileRequired": "Zəhmət olmasa fayl seçin.",
   "mat.urlRequired": "Zəhmət olmasa URL daxil edin.",
   "mat.badge.public": "Açıq",
   "mat.badge.private": "Şəxsi",
   "mat.folder": "Qovluq",
-  "mat.uploadFailed": "Faylı oxumaq mümkün olmadı.",
+  "mat.uploadFailed": "Faylı yükləmək mümkün olmadı.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.",
+  "err.network": "Serverə qoşulmaq mümkün olmadı. İnternet bağlantınızı yoxlayıb yenidən cəhd edin.",
+  "err.not_authenticated": "Davam etmək üçün daxil olun.",
+  "err.teachers_only": "Bunu yalnız müəllimlər edə bilər.",
+  "err.admins_only": "Bunu yalnız sayt administratorları edə bilər.",
+  "err.invalid_credentials": "E-poçt/istifadəçi adı və ya şifrə yanlışdır.",
+  "err.login_failed": "Daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.registration_failed": "Hesab yaratmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.email_taken": "Bu e-poçt ilə artıq hesab var.",
+  "err.username_taken": "Bu istifadəçi adı artıq tutulub.",
+  "err.google_email_unverified": "Google e-poçt ünvanınız təsdiqlənməyib.",
+  "err.google_failed": "Google ilə daxil olmaq alınmadı. Yenidən cəhd edin.",
+  "err.google_not_configured": "Google ilə daxil olmaq hazırda mümkün deyil.",
+  "err.email_not_configured": "E-poçt göndərmək hazırda mümkün deyil.",
+  "err.reset_email_failed": "Bərpa məktubunu göndərmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.reset_link_invalid": "Bu bərpa linki etibarsızdır və ya vaxtı keçib.",
+  "err.reset_failed": "Şifrəni bərpa etmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.group_not_yours": "Yalnız öz qruplarınızdan istifadə edə bilərsiniz.",
+  "err.student_not_found": "Bu e-poçt və ya istifadəçi adı ilə şagird tapılmadı.",
+  "err.not_a_student": "Bu hesab şagird hesabı deyil.",
+  "err.already_in_group": "Bu şagird artıq qrupdadır.",
+  "err.no_attempts_left": "Bu test üçün bütün cəhdlərinizi istifadə etmisiniz.",
+  "err.save_failed": "Yadda saxlamaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.invalid_folder": "Düzgün qovluq seçin.",
+  "err.not_found": "Tapılmadı və ya buna giriş icazəniz yoxdur.",
+  "err.storage_not_configured": "Fayl yükləmək hazırda mümkün deyil.",
+  "err.upload_failed": "Faylı yükləmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.file_open_failed": "Faylı açmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.file_too_large": "Fayl çox böyükdür. Limit {max} MB-dır.",
+  "err.invalid_url": "http:// və ya https:// ilə başlayan düzgün link daxil edin.",
+  "err.db_unavailable": "Sayt müvəqqəti olaraq əlçatan deyil. Bir dəqiqədən sonra yenidən cəhd edin.",
+  "err.password_too_short": "Şifrə ən azı 8 simvoldan ibarət olmalıdır.",
+  "err.password_needs_special": "Şifrədə ən azı bir xüsusi simvol olmalıdır (məsələn, ! və ya #).",
+  "err.invalid_email": "Düzgün e-poçt ünvanı daxil edin.",
+  "err.username_too_short": "İstifadəçi adı ən azı 2 simvol olmalıdır.",
+  "err.field_required": "Zəhmət olmasa doldurun: {field}.",
+  "err.invalid_field": "Zəhmət olmasa yoxlayın: {field}.",
+  "field.email": "E-poçt",
+  "field.username": "İstifadəçi adı",
+  "field.password": "Şifrə",
+  "field.fullName": "Ad və soyad",
+  "field.identifier": "E-poçt və ya istifadəçi adı",
+  "field.title": "Başlıq",
+  "field.meetingUrl": "Görüş linki",
+  "field.name": "Ad",
+  "field.prompt": "Sualın mətni",
+  "field.message": "Mesaj",
+  "field.questions": "Suallar",
+  "field.startAt": "Başlama vaxtı",
+  "field.durationMinutes": "Müddət",
+  "field.groupId": "Qrup",
+  "field.options": "Cavab variantları",
+  "field.unknown": "sahələrdən biri",
+  // --- Math formulas ---
+  "math.toolbar": "Düstur alətləri",
+  "math.preview": "Önizləmə",
+  "math.hint": "İpucu: düsturları $ işarələri arasında yazın, məsələn $\\frac{1}{2}$ və ya $x^2$, ya da yuxarıdakı düymələrdən istifadə edin.",
+  "math.fraction": "Kəsr",
+  "math.power": "Qüvvət",
+  "math.sqrt": "Kvadrat kök",
+  "math.root": "n-ci dərəcədən kök",
+  "math.index": "İndeks",
+  "math.pi": "Pi",
+  "math.le": "Kiçik və ya bərabər",
+  "math.ge": "Böyük və ya bərabər",
+  "math.ne": "Bərabər deyil",
+  "math.pm": "Üstəgəl-çıx",
+  "math.dot": "Vurma nöqtəsi",
+  "math.degree": "Dərəcə",
+  "math.angle": "Bucaq",
+  "math.abs": "Modul",
+  "math.log": "Loqarifm",
+  "math.sin": "Sinus",
+  "math.integral": "İnteqral",
+  "math.sum": "Cəm",
+  // --- Printing ---
+  "print.button": "Çap et",
+  "print.back": "Testlərə qayıt",
+  "print.includeKey": "Cavab açarını əlavə et",
+  "print.print": "Çap et / PDF kimi saxla",
+  "print.hint": "Çap pəncərəsində printer olaraq \"PDF kimi saxla\" seçin və PDF fayl alın. Cavab açarı ayrıca səhifədə çap olunur.",
+  "print.name": "Ad, soyad",
+  "print.class": "Sinif",
+  "print.date": "Tarix",
+  "print.summary": "{count} sual · {points} bal · {minutes} dəq",
+  "print.points": "{n} bal",
+  "print.keyTitle": "Cavab açarı: {title}",
+  // --- Question bank / variants ---
+  "bank.saveToBank": "Banka saxla",
+  "bank.saved": "Sual bankınıza saxlanıldı",
+  "bank.saveFailed": "Banka saxlamaq mümkün olmadı",
+  "bank.topicPlaceholder": "Mövzu, məs. Kəsrlər",
+  "bank.noDifficulty": "Çətinlik…",
+  "bank.easy": "Asan",
+  "bank.medium": "Orta",
+  "bank.hard": "Çətin",
+  "bank.addFromBank": "Bankdan əlavə et",
+  "bank.title": "Sual bankı",
+  "bank.description": "Saxladığınız suallar. Bu testə əlavə ediləcəkləri seçin.",
+  "bank.allTopics": "Bütün mövzular",
+  "bank.allDifficulties": "Bütün çətinliklər",
+  "bank.empty": "Hələ sual yoxdur. Sonra istifadə etmək üçün istənilən sualda “Banka saxla” düyməsini basın.",
+  "bank.delete": "Bankdan sil",
+  "bank.addSelected": "Seçilmiş {n} sualı əlavə et",
+  "variant.pickCount": "Hər şagirdə təsadüfi sual sayı",
+  "variant.pickHint": "Hər şagird aşağıdakı {total} sualdan təsadüfi seçilmiş bu qədər sual alır. 0 = hamı bütün sualları alır.",
+  "variant.shuffle": "Sualları və cavabları qarışdır",
+  "variant.shuffleHint": "Hər şagird fərqli ardıcıllıq görür, beləliklə yan-yana oturanlar köçürə bilməz.",
+  // --- Deadlines ---
+  "due.label": "Son tarix (ev tapşırığı)",
+  "due.hint": "Son tarix olmasın deyə boş buraxın; son tarixdən sonra şagirdlər testi göndərə bilməz.",
+  "due.by": "Son tarix: {date}",
+  "due.passed": "Son tarix keçib ({date})",
+  "due.closedButton": "Son tarix keçib",
+  "due.bannerTitle": "24 saat ərzində təhvil verilməli ev tapşırığı: {n}",
+  "err.deadline_passed": "Bu testin son tarixi keçib.",
+  // --- Progress ---
+  "nav.progress": "İnkişafım",
+  "prog.title": "İnkişafım",
+  "prog.sub": "Nəticələrinizin zamanla necə dəyişdiyi və hansı mövzularda daha çox məşq lazım olduğu.",
+  "prog.teacherSub": "Sizin testlərinizdəki inkişaf.",
+  "prog.back": "Geri",
+  "prog.empty": "Hələ bitmiş test yoxdur. İlk testdən sonra nəticələr burada görünəcək.",
+  "prog.average": "Orta nəticə",
+  "prog.quizzesDone": "Həll edilmiş testlər",
+  "prog.needsWork": "Daha çox məşq lazımdır",
+  "prog.nothingWeak": "Heç nə — afərin!",
+  "prog.chartTitle": "Hər testin nəticəsi",
+  "prog.pendingNote": "{n} test hələ müəllim tərəfindən yoxlanılır; nəticə arta bilər.",
+  "prog.score": "Nəticə",
+  "prog.showTable": "Cədvəl kimi göstər",
+  "prog.hideTable": "Cədvəli gizlət",
+  "prog.colQuiz": "Test",
+  "prog.colDate": "Tarix",
+  "prog.topicsTitle": "Mövzular",
+  "prog.topicsHint": "Ən zəifləri əvvəldə. Yazılı cavablar müəllim yoxladıqdan sonra hesablanır.",
+  "prog.noTopic": "Mövzusuz",
+  "prog.level.strong": "Güclü",
+  "prog.level.ok": "Normal",
+  "prog.level.weak": "Məşq lazımdır",
+  "prog.trend.up": "Yaxşılaşır",
+  "prog.trend.down": "Zəifləyir",
+  "prog.trend.steady": "Sabit",
+  // --- Parent links ---
+  "err.students_only": "Bunu yalnız şagirdlər edə bilər.",
+  "parent.title": "Valideynlə paylaş",
+  "parent.desc": "Valideynin daxil olmadan bu inkişaf səhifəsini görməsi üçün şəxsi link yaradın. Valideyn heç nəyi dəyişə bilməz.",
+  "parent.create": "Valideyn linki yarat",
+  "parent.newLink": "Yeni link yarat",
+  "parent.newLinkHint": "Yeni link yaratdıqda köhnəsi deaktiv olur.",
+  "parent.copy": "Kopyala",
+  "parent.copied": "Link kopyalandı",
+  "parent.onlyOnce": "İndi kopyalayın: təhlükəsizlik üçün tam link yalnız bir dəfə göstərilir.",
+  "parent.activeSince": "Valideyn linki aktivdir ({date} yaradılıb).",
+  "parent.turnOff": "Linki deaktiv et",
+  "parent.turnedOff": "Valideyn linki deaktiv edildi",
+  "parent.failed": "Link yaratmaq mümkün olmadı",
+  "parent.invalidTitle": "Bu link işləmir",
+  "parent.invalidDesc": "Link deaktiv edilmiş və ya yenisi ilə əvəz olunmuş ola bilər. Yeni link istəyin.",
+  "parent.viewLabel": "İnkişaf hesabatı",
+  "parent.viewSub": "math.az-dan sizinlə paylaşılmış, yalnız baxış üçün səhifə.",
 };
 
 const ru: Dict = {
@@ -1256,16 +1584,238 @@ const ru: Dict = {
   "mat.replaceFile": "Заменить файл (необязательно)",
   "mat.keepFile": "Оставьте пустым, чтобы сохранить текущий файл.",
   "mat.currentFile": "Текущий: {name}",
-  "mat.tooBig": "Файл слишком большой. Используйте файлы до 50 МБ.",
+  "mat.tooBig": "Файл слишком большой.",
+  "mat.uploading": "Загрузка…",
   "mat.fileRequired": "Пожалуйста, выберите файл.",
   "mat.urlRequired": "Пожалуйста, введите URL.",
   "mat.badge.public": "Открыто",
   "mat.badge.private": "Личное",
   "mat.folder": "Папка",
-  "mat.uploadFailed": "Не удалось прочитать файл.",
+  "mat.uploadFailed": "Не удалось загрузить файл.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+  "err.network": "Не удалось связаться с сервером. Проверьте подключение к интернету и попробуйте ещё раз.",
+  "err.not_authenticated": "Пожалуйста, войдите, чтобы продолжить.",
+  "err.teachers_only": "Это могут делать только учителя.",
+  "err.admins_only": "Это могут делать только администраторы сайта.",
+  "err.invalid_credentials": "Неверный email/имя пользователя или пароль.",
+  "err.login_failed": "Не удалось войти. Попробуйте ещё раз.",
+  "err.registration_failed": "Не удалось создать аккаунт. Попробуйте ещё раз.",
+  "err.email_taken": "Аккаунт с этим email уже существует.",
+  "err.username_taken": "Это имя пользователя уже занято.",
+  "err.google_email_unverified": "Ваш email в Google не подтверждён.",
+  "err.google_failed": "Не удалось войти через Google. Попробуйте ещё раз.",
+  "err.google_not_configured": "Вход через Google сейчас недоступен.",
+  "err.email_not_configured": "Отправка писем сейчас недоступна.",
+  "err.reset_email_failed": "Не удалось отправить письмо для сброса. Попробуйте ещё раз.",
+  "err.reset_link_invalid": "Ссылка для сброса недействительна или устарела.",
+  "err.reset_failed": "Не удалось сбросить пароль. Попробуйте ещё раз.",
+  "err.group_not_yours": "Можно использовать только свои группы.",
+  "err.student_not_found": "Ученик с таким email или именем пользователя не найден.",
+  "err.not_a_student": "Этот аккаунт не является аккаунтом ученика.",
+  "err.already_in_group": "Этот ученик уже в группе.",
+  "err.no_attempts_left": "Вы использовали все попытки для этого теста.",
+  "err.save_failed": "Не удалось сохранить. Попробуйте ещё раз.",
+  "err.invalid_folder": "Выберите правильную папку.",
+  "err.not_found": "Не найдено, или у вас нет доступа.",
+  "err.storage_not_configured": "Загрузка файлов сейчас недоступна.",
+  "err.upload_failed": "Не удалось загрузить файл. Попробуйте ещё раз.",
+  "err.file_open_failed": "Не удалось открыть файл. Попробуйте ещё раз.",
+  "err.file_too_large": "Файл слишком большой. Ограничение — {max} МБ.",
+  "err.invalid_url": "Введите правильную ссылку, начинающуюся с http:// или https://.",
+  "err.db_unavailable": "Сайт временно недоступен. Попробуйте через минуту.",
+  "err.password_too_short": "Пароль должен содержать не менее 8 символов.",
+  "err.password_needs_special": "В пароле должен быть хотя бы один специальный символ (например, ! или #).",
+  "err.invalid_email": "Введите правильный адрес email.",
+  "err.username_too_short": "Имя пользователя должно содержать не менее 2 символов.",
+  "err.field_required": "Пожалуйста, заполните: {field}.",
+  "err.invalid_field": "Пожалуйста, проверьте: {field}.",
+  "field.email": "Email",
+  "field.username": "Имя пользователя",
+  "field.password": "Пароль",
+  "field.fullName": "Имя и фамилия",
+  "field.identifier": "Email или имя пользователя",
+  "field.title": "Название",
+  "field.meetingUrl": "Ссылка на встречу",
+  "field.name": "Название",
+  "field.prompt": "Текст вопроса",
+  "field.message": "Сообщение",
+  "field.questions": "Вопросы",
+  "field.startAt": "Время начала",
+  "field.durationMinutes": "Длительность",
+  "field.groupId": "Группа",
+  "field.options": "Варианты ответа",
+  "field.unknown": "одно из полей",
+  // --- Math formulas ---
+  "math.toolbar": "Инструменты формул",
+  "math.preview": "Предпросмотр",
+  "math.hint": "Подсказка: пишите формулы между знаками $, например $\\frac{1}{2}$ или $x^2$, или используйте кнопки выше.",
+  "math.fraction": "Дробь",
+  "math.power": "Степень",
+  "math.sqrt": "Квадратный корень",
+  "math.root": "Корень n-й степени",
+  "math.index": "Нижний индекс",
+  "math.pi": "Пи",
+  "math.le": "Меньше или равно",
+  "math.ge": "Больше или равно",
+  "math.ne": "Не равно",
+  "math.pm": "Плюс-минус",
+  "math.dot": "Знак умножения",
+  "math.degree": "Градусы",
+  "math.angle": "Угол",
+  "math.abs": "Модуль",
+  "math.log": "Логарифм",
+  "math.sin": "Синус",
+  "math.integral": "Интеграл",
+  "math.sum": "Сумма",
+  // --- Printing ---
+  "print.button": "Печать",
+  "print.back": "Назад к тестам",
+  "print.includeKey": "Добавить ключ ответов",
+  "print.print": "Печать / Сохранить как PDF",
+  "print.hint": "В окне печати выберите принтер «Сохранить как PDF», чтобы получить PDF-файл. Ключ ответов печатается на отдельной странице.",
+  "print.name": "Имя",
+  "print.class": "Класс",
+  "print.date": "Дата",
+  "print.summary": "{count} вопросов · {points} баллов · {minutes} мин",
+  "print.points": "{n} б.",
+  "print.keyTitle": "Ключ ответов: {title}",
+  // --- Question bank / variants ---
+  "bank.saveToBank": "В банк",
+  "bank.saved": "Сохранено в банк вопросов",
+  "bank.saveFailed": "Не удалось сохранить в банк",
+  "bank.topicPlaceholder": "Тема, напр. Дроби",
+  "bank.noDifficulty": "Сложность…",
+  "bank.easy": "Лёгкий",
+  "bank.medium": "Средний",
+  "bank.hard": "Сложный",
+  "bank.addFromBank": "Добавить из банка",
+  "bank.title": "Банк вопросов",
+  "bank.description": "Ваши сохранённые вопросы. Выберите, какие добавить в этот тест.",
+  "bank.allTopics": "Все темы",
+  "bank.allDifficulties": "Любая сложность",
+  "bank.empty": "Здесь пока нет вопросов. Нажмите «В банк» у любого вопроса, чтобы сохранить его.",
+  "bank.delete": "Удалить из банка",
+  "bank.addSelected": "Добавить выбранные ({n})",
+  "variant.pickCount": "Случайных вопросов на ученика",
+  "variant.pickHint": "Каждый ученик получит столько вопросов, выбранных случайно из {total} ниже. 0 = все получают все вопросы.",
+  "variant.shuffle": "Перемешать вопросы и ответы",
+  "variant.shuffleHint": "У каждого ученика свой порядок, поэтому соседи не смогут списать.",
+  // --- Deadlines ---
+  "due.label": "Срок сдачи (домашнее задание)",
+  "due.hint": "Оставьте срок пустым, если его нет; после срока ученики не смогут отправить тест.",
+  "due.by": "Сдать до {date}",
+  "due.passed": "Срок прошёл ({date})",
+  "due.closedButton": "Срок прошёл",
+  "due.bannerTitle": "Домашние задания со сроком в ближайшие 24 часа: {n}",
+  "err.deadline_passed": "Срок сдачи этого теста прошёл.",
+  // --- Progress ---
+  "nav.progress": "Мой прогресс",
+  "prog.title": "Мой прогресс",
+  "prog.sub": "Как меняются ваши результаты и каким темам нужно больше практики.",
+  "prog.teacherSub": "Прогресс по вашим тестам.",
+  "prog.back": "Назад",
+  "prog.empty": "Пока нет завершённых тестов. Результаты появятся после первого теста.",
+  "prog.average": "Средний результат",
+  "prog.quizzesDone": "Пройдено тестов",
+  "prog.needsWork": "Нужно больше практики",
+  "prog.nothingWeak": "Ничего — молодец!",
+  "prog.chartTitle": "Результат по тестам",
+  "prog.pendingNote": "{n} тест(а) ещё проверяет учитель; результат может вырасти.",
+  "prog.score": "Результат",
+  "prog.showTable": "Показать таблицей",
+  "prog.hideTable": "Скрыть таблицу",
+  "prog.colQuiz": "Тест",
+  "prog.colDate": "Дата",
+  "prog.topicsTitle": "Темы",
+  "prog.topicsHint": "Сначала самые слабые. Письменные ответы учитываются после проверки учителем.",
+  "prog.noTopic": "Без темы",
+  "prog.level.strong": "Сильная",
+  "prog.level.ok": "Нормально",
+  "prog.level.weak": "Нужна практика",
+  "prog.trend.up": "Улучшается",
+  "prog.trend.down": "Ухудшается",
+  "prog.trend.steady": "Стабильно",
+  // --- Parent links ---
+  "err.students_only": "Это могут делать только ученики.",
+  "parent.title": "Поделиться с родителем",
+  "parent.desc": "Создайте личную ссылку, чтобы родитель мог видеть эту страницу прогресса без входа. Изменить ничего нельзя.",
+  "parent.create": "Создать ссылку для родителя",
+  "parent.newLink": "Создать новую ссылку",
+  "parent.newLinkHint": "Новая ссылка отключает старую.",
+  "parent.copy": "Копировать",
+  "parent.copied": "Ссылка скопирована",
+  "parent.onlyOnce": "Скопируйте сейчас: из соображений безопасности полная ссылка показывается только один раз.",
+  "parent.activeSince": "Ссылка для родителя активна (создана {date}).",
+  "parent.turnOff": "Отключить ссылку",
+  "parent.turnedOff": "Ссылка для родителя отключена",
+  "parent.failed": "Не удалось создать ссылку",
+  "parent.invalidTitle": "Эта ссылка не работает",
+  "parent.invalidDesc": "Возможно, её отключили или заменили новой. Попросите новую ссылку.",
+  "parent.viewLabel": "Отчёт о прогрессе",
+  "parent.viewSub": "Страница только для просмотра, которой с вами поделились на math.az.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };
+
+function fill(str: string, vars?: Record<string, string | number>) {
+  if (!vars) return str;
+  for (const [k, v] of Object.entries(vars)) str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+  return str;
+}
+
+export function hasTranslation(lang: Lang, key: string): boolean {
+  return typeof DICTS[lang][key] === "string";
+}
+
+/** An error from the API: `code` (+ `params`) from the server, see server/errors.ts. */
+export type ApiErrorInfo = { code?: string; params?: Record<string, string>; message?: string };
+
+/** The text to show the user for an API error, in the given language. */
+export function translateError(err: ApiErrorInfo, lang: Lang): string {
+  const dict = DICTS[lang];
+  const code = err.code && dict[`err.${err.code}`] ? err.code : "generic";
+  const params: Record<string, string> = { ...(err.params ?? {}) };
+  if ("field" in params) params.field = dict[`field.${params.field}`] ?? dict["field.unknown"];
+  if (code === "file_too_large" && !params.max) params.max = "?";
+  return fill(dict[`err.${code}`], params);
+}
+
+const LANG_KEY = "mathaz.lang";
+const isLang = (v: unknown): v is Lang => v === "en" || v === "az" || v === "ru";
+
+/** The language saved in the browser, or Azerbaijani. */
+export function readSavedLang(store: { getItem(k: string): string | null } | undefined): Lang {
+  try {
+    const v = store?.getItem(LANG_KEY);
+    return isLang(v) ? v : "az";
+  } catch {
+    return "az";
+  }
+}
+
+// The current language, readable outside React (used to translate API errors
+// in lib/queryClient.ts).
+let currentLang: Lang = readSavedLang(typeof window !== "undefined" ? window.localStorage : undefined);
+export const getCurrentLang = () => currentLang;
+
+const LOCALES: Record<Lang, string> = { en: "en-GB", az: "az-AZ", ru: "ru-RU" };
+
+// Azerbaijani names, built in: not every browser ships Azerbaijani date data.
+const AZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avqust", "sentyabr", "oktyabr", "noyabr", "dekabr"];
+const AZ_WEEKDAYS = ["bazar", "bazar ertəsi", "çərşənbə axşamı", "çərşənbə", "cümə axşamı", "cümə", "şənbə"];
+
+/** A date and time written in the site's language, e.g. "22 noyabr, şənbə 14:30". */
+export function formatDateTime(ts: number, lang: Lang = currentLang): string {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (lang === "az") return `${d.getDate()} ${AZ_MONTHS[d.getMonth()]}, ${AZ_WEEKDAYS[d.getDay()]} ${hh}:${mm}`;
+  // Date and time separately: joined formats vary oddly between locales.
+  const date = new Intl.DateTimeFormat(LOCALES[lang], { weekday: "long", day: "numeric", month: "long" }).format(d);
+  return `${date} ${hh}:${mm}`;
+}
 
 type I18nCtx = {
   lang: Lang;
@@ -1280,17 +1830,22 @@ const Ctx = createContext<I18nCtx>({
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>("az");
+  const [lang, setLangState] = useState<Lang>(currentLang);
 
-  const t = (key: string, vars?: Record<string, string | number>) => {
-    let str = DICTS[lang][key] ?? DICTS.en[key] ?? key;
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) {
-        str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
-      }
+  // Remember the choice so the site (and its error messages) stay in this
+  // language after a refresh.
+  const setLang = (l: Lang) => {
+    currentLang = l;
+    setLangState(l);
+    try {
+      window.localStorage.setItem(LANG_KEY, l);
+    } catch {
+      // Storage can be blocked; the choice then lasts until the page reloads.
     }
-    return str;
   };
+
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    fill(DICTS[lang][key] ?? DICTS.en[key] ?? key, vars);
 
   return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
 }

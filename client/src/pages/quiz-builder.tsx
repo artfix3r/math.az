@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { MathEditor, MathText } from "@/components/math-text";
+import { AddFromBank, QuestionMetaRow } from "@/components/question-bank";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -33,6 +36,8 @@ function blank(type: QType): Question {
     correctNumber: undefined,
     tolerance: 0,
     points: 1,
+    topic: "",
+    difficulty: "",
   };
 }
 function toLocalInput(ts?: number | null) {
@@ -55,7 +60,10 @@ export default function QuizBuilder({ id }: { id?: number }) {
   const [groupId, setGroupId] = useState<string>("none");
   const [duration, setDuration] = useState(30);
   const [startAt, setStartAt] = useState("");
+  const [dueAt, setDueAt] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(1);
+  const [pickCount, setPickCount] = useState(0);
+  const [shuffle, setShuffle] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([blank("mcq")]);
 
   useEffect(() => {
@@ -65,7 +73,10 @@ export default function QuizBuilder({ id }: { id?: number }) {
       setGroupId(existing.groupId ? String(existing.groupId) : "none");
       setDuration(existing.durationMinutes);
       setStartAt(toLocalInput(existing.startAt));
+      setDueAt(toLocalInput(existing.dueAt));
       setMaxAttempts((existing as any).maxAttempts ?? 1);
+      setPickCount(existing.pickCount ?? 0);
+      setShuffle(!!existing.shuffle);
       const qs: Question[] = JSON.parse(existing.questions || "[]");
       if (qs.length) setQuestions(qs);
     }
@@ -91,7 +102,10 @@ export default function QuizBuilder({ id }: { id?: number }) {
         groupId: groupId === "none" ? null : Number(groupId),
         durationMinutes: Number(duration),
         maxAttempts: Math.max(0, Number(maxAttempts) || 0),
+        pickCount: pickCount > 0 && pickCount < questions.length ? Math.floor(pickCount) : 0,
+        shuffle: shuffle ? 1 : 0,
         startAt: startAt ? new Date(startAt).getTime() : null,
+        dueAt: dueAt ? new Date(dueAt).getTime() : null,
         questions: JSON.stringify(questions.map((q) => ({ ...q, points: Number(q.points) || 1 }))),
         isTemplate: 0,
       };
@@ -154,7 +168,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
           <Label className="font-bold">{t("qb.descLabel")} ({t("common.optional")})</Label>
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("qb.descPlaceholder")} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label className="font-bold">{t("qb.assignGroup")}</Label>
             <Select value={groupId} onValueChange={setGroupId}>
@@ -170,6 +184,10 @@ export default function QuizBuilder({ id }: { id?: number }) {
             <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} data-testid="input-start-at" />
           </div>
           <div className="space-y-1.5">
+            <Label className="font-bold">{t("due.label")}</Label>
+            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} data-testid="input-due-at" />
+          </div>
+          <div className="space-y-1.5">
             <Label className="font-bold">{t("qb.duration")}</Label>
             <Input type="number" min={1} value={duration} onChange={(e) => setDuration(Number(e.target.value))} data-testid="input-duration" />
           </div>
@@ -178,7 +196,21 @@ export default function QuizBuilder({ id }: { id?: number }) {
             <Input type="number" min={0} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} data-testid="input-max-attempts" />
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")}</p>
+        <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")} {t("due.hint")}</p>
+        <div className="grid gap-4 rounded-xl border border-dashed p-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="font-bold">{t("variant.pickCount")}</Label>
+            <Input type="number" min={0} max={questions.length} value={pickCount} onChange={(e) => setPickCount(Math.max(0, Number(e.target.value) || 0))} className="w-28" data-testid="input-pick-count" />
+            <p className="text-xs text-muted-foreground">{t("variant.pickHint", { total: questions.length })}</p>
+          </div>
+          <div className="flex items-start gap-2 pt-7">
+            <Checkbox id="shuffle" checked={shuffle} onCheckedChange={(v) => setShuffle(v === true)} data-testid="checkbox-shuffle" />
+            <div>
+              <Label htmlFor="shuffle" className="font-bold">{t("variant.shuffle")}</Label>
+              <p className="text-xs text-muted-foreground">{t("variant.shuffleHint")}</p>
+            </div>
+          </div>
+        </div>
         <p className="text-xs text-muted-foreground">{t("qb.anytimeHint", { points: totalPoints, count: questions.length })}</p>
       </Card>
 
@@ -198,7 +230,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
             </div>
 
             <div className="mt-3 space-y-3">
-              <Textarea value={q.prompt} onChange={(e) => update(q.id, { prompt: e.target.value })} placeholder={t("qb.promptPlaceholder")} data-testid={`input-prompt-${idx}`} />
+              <MathEditor value={q.prompt} onChange={(v) => update(q.id, { prompt: v })} placeholder={t("qb.promptPlaceholder")} testId={`input-prompt-${idx}`} />
 
               {q.type === "photo" && (
                 <div className="space-y-1.5">
@@ -232,6 +264,9 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         placeholder={`${t("common.add")} ${oi + 1}`}
                         data-testid={`input-option-${idx}-${oi}`}
                       />
+                      {opt.includes("$") && (
+                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
+                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndex: 0 })}>
                           <Trash2 className="h-4 w-4" />
@@ -265,6 +300,9 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         placeholder={`${t("common.add")} ${oi + 1}`}
                         data-testid={`input-option-${idx}-${oi}`}
                       />
+                      {opt.includes("$") && (
+                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
+                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndexes: (q.correctIndexes ?? []).filter((c) => c !== oi).map((c) => (c > oi ? c - 1 : c)) })}>
                           <Trash2 className="h-4 w-4" />
@@ -329,6 +367,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
                 <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">{t("qb.photoHint")}</p>
               )}
 
+              <QuestionMetaRow q={q} index={idx} onChange={(patch) => update(q.id, patch)} />
+
               <div className="flex items-center gap-2">
                 <Label className="text-sm font-bold">{t("common.points")}</Label>
                 <Input type="number" min={1} value={q.points} onChange={(e) => update(q.id, { points: Number(e.target.value) })} className="w-24" data-testid={`input-points-${idx}`} />
@@ -348,6 +388,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("numeric")} data-testid="button-add-numeric"><Hash className="h-4 w-4" /> {t("qtype.numeric")}</Button>
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("open")} data-testid="button-add-open"><FileText className="h-4 w-4" /> {t("qtype.open")}</Button>
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("photo")} data-testid="button-add-photo"><ImageIcon className="h-4 w-4" /> {t("qtype.photo")}</Button>
+        <span className="mx-1 h-6 w-px bg-border" />
+        <AddFromBank onAdd={(qs) => setQuestions((cur) => [...cur.filter((q) => q.prompt.trim()), ...qs])} />
       </Card>
     </div>
   );

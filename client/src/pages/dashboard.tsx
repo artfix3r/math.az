@@ -1,4 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { AlarmClock } from "lucide-react";
+import { formatDue } from "@/components/due-badge";
+import { deadlineState } from "@shared/deadlines";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -43,8 +46,28 @@ export default function Dashboard() {
   const timeOnly = (ts?: number | null) =>
     ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("quiz.anytime");
 
+  // Homework due within a day that the student hasn't handed in yet.
+  const dueSoon = isTeacher ? [] : (quizzes ?? []).filter(
+    (q) => !(q as StudentQuiz).submission && deadlineState(q.dueAt, now) === "soon",
+  );
+
   return (
     <div className="space-y-8">
+      {dueSoon.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4" data-testid="banner-due-soon">
+          <p className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+            <AlarmClock className="h-4 w-4" /> {t("due.bannerTitle", { n: dueSoon.length })}
+          </p>
+          <ul className="mt-2 space-y-1">
+            {dueSoon.map((q) => (
+              <li key={q.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <Link href={`/quizzes/${q.id}/take`} className="font-bold text-primary underline-offset-2 hover:underline">{q.title}</Link>
+                <span className="text-muted-foreground">{t("due.by", { date: formatDue(q.dueAt!) })}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-pink-500/10 p-6 sm:p-8">
         <p className="text-sm font-bold text-primary">{greeting} 👋</p>
         <h1 className="mt-1 text-3xl font-black tracking-tight" data-testid="text-greeting">

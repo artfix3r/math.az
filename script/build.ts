@@ -6,6 +6,7 @@ import { rm, readFile } from "node:fs/promises";
 // which helps cold start times
 const allowlist = [
   "@google/generative-ai",
+  "@supabase/storage-js",
   "axios",
   "cors",
   "date-fns",
@@ -75,7 +76,9 @@ async function buildAll() {
     platform: "node",
     bundle: true,
     format: "esm",
-    outfile: "api/index.js",
+    // api/index.js (committed) re-exports this file. Vercel checks that the
+    // api/ entry exists before the build runs, so it can't be generated.
+    outfile: "dist/server/vercel-handler.mjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },

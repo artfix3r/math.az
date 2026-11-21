@@ -128,7 +128,11 @@ export default function GroupDetail({ id }: { id: number }) {
                     {m.fullName[0]?.toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold">{m.fullName}</p>
+                    {isTeacher ? (
+                      <Link href={`/students/${m.id}/progress`} className="truncate font-bold hover:text-primary hover:underline" data-testid={`link-progress-${m.id}`}>{m.fullName}</Link>
+                    ) : (
+                      <p className="truncate font-bold">{m.fullName}</p>
+                    )}
                     <p className="truncate text-xs text-muted-foreground">{m.email}</p>
                   </div>
                   {isTeacher && (

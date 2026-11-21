@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MathText } from "@/components/math-text";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -25,7 +26,7 @@ import type { Quiz, Question } from "@shared/schema";
 type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
-  gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number;
+  gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number; questionIds?: string;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -121,6 +122,10 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
   const { t } = useT();
   const { toast } = useToast();
   const answers: Record<string, { answer: string | number }> = JSON.parse(sub.answers || "{}");
+  // With random questions per student, only show the ones this student got.
+  const shownIds: Set<string> | null = (() => {
+    try { return sub.questionIds ? new Set<string>(JSON.parse(sub.questionIds)) : null; } catch { return null; }
+  })();
 
   // Per-question awarded points. If this submission was already graded, reload the
   // teacher's saved per-question points so re-opening the dialog shows their work.
@@ -153,7 +158,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
       const ok = Number(a) === q.correctIndex;
       return (
         <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {(q.options ?? [])[Number(a)] ?? "—"} {ok ? "✓" : `— ${t("qr.correctIs")}: ${(q.options ?? [])[q.correctIndex ?? 0]}`}
+          {t("qr.chose")}: <MathText text={(q.options ?? [])[Number(a)] ?? "—"} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={(q.options ?? [])[q.correctIndex ?? 0] ?? ""} /></>}
         </p>
       );
     }
@@ -173,7 +178,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
       const correctStr = (q.correctIndexes ?? []).map((i) => (q.options ?? [])[i]).filter(Boolean).join(", ");
       return (
         <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {chosen} {ok ? "✓" : `— ${t("qr.correctIs")}: ${correctStr}`}
+          {t("qr.chose")}: <MathText text={chosen} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={correctStr} /></>}
         </p>
       );
     }
@@ -234,7 +239,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
           <DialogHeader><DialogTitle>{t("qr.grade")} — {sub.studentName}</DialogTitle></DialogHeader>
           <p className="-mt-1 text-sm text-muted-foreground">{t("qr.gradeHint")}</p>
           <div className="space-y-4">
-            {questions.map((q, idx) => {
+            {questions.filter((q) => shownIds === null || shownIds.has(q.id)).map((q, idx) => {
               const a = answers[q.id]?.answer;
               const c = isCorrect(q, a);
               const isManual = c === null;
@@ -247,7 +252,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
                     {c === false && <Badge variant="destructive">{t("qr.autoWrong")}</Badge>}
                     {isManual && <Badge className="bg-violet-500 text-white">{t("qr.manualGrade")}</Badge>}
                   </div>
-                  <p className="mt-1 font-bold">{q.prompt}</p>
+                  <p className="mt-1 font-bold"><MathText text={q.prompt} /></p>
                   {q.type === "photo" && q.imageUrl && <img src={q.imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border object-contain" />}
                   {isManual ? (
                     <div className="mt-2">

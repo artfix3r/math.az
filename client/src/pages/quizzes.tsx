@@ -1,4 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { deadlineState } from "@shared/deadlines";
+import { DueBadge } from "@/components/due-badge";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   FileQuestion, Plus, Clock, CalendarClock, BarChart3, Pencil, Trash2,
-  Archive, Play, CheckCircle2, Hourglass,
+  Archive, Play, CheckCircle2, Hourglass, Printer,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import type { Quiz, Question } from "@shared/schema";
@@ -78,6 +80,7 @@ function TeacherQuizzes() {
                   <StateBadge state={st} t={t} />
                 </div>
                 {q.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{q.description}</p>}
+                <DueBadge dueAt={q.dueAt} className="mt-2 self-start" />
                 <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
                   <span className="flex items-center gap-1"><FileQuestion className="h-3.5 w-3.5" /> {qs.length} {t("common.questions")}</span>
                   <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {q.durationMinutes} {t("common.min")}</span>
@@ -86,6 +89,7 @@ function TeacherQuizzes() {
                 <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
                   <Link href={`/quizzes/${q.id}/results`}><Button size="sm" variant="outline" className="gap-1.5 font-bold" data-testid={`button-results-${q.id}`}><BarChart3 className="h-3.5 w-3.5" /> {t("quiz.results")}</Button></Link>
                   <Link href={`/quizzes/${q.id}/edit`}><Button size="sm" variant="outline" className="gap-1.5 font-bold"><Pencil className="h-3.5 w-3.5" /> {t("common.edit")}</Button></Link>
+                  <Link href={`/quizzes/${q.id}/print`}><Button size="sm" variant="outline" className="gap-1.5 font-bold" data-testid={`button-print-${q.id}`}><Printer className="h-3.5 w-3.5" /> {t("print.button")}</Button></Link>
                   <Button size="sm" variant="outline" className="gap-1.5 font-bold" onClick={() => saveTemplate.mutate(q.id)} data-testid={`button-backup-${q.id}`}><Archive className="h-3.5 w-3.5" /> {t("quiz.backup")}</Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -126,7 +130,8 @@ function StudentQuizzes() {
             const qs: Question[] = JSON.parse(q.questions || "[]");
             const st = windowState(q);
             const done = !!q.submission;
-            const canTake = !done && (st === "open" || st === "unscheduled");
+            const pastDue = deadlineState(q.dueAt, Date.now()) === "closed";
+            const canTake = !done && !pastDue && (st === "open" || st === "unscheduled");
             return (
               <Card key={q.id} className="flex flex-col p-5" data-testid={`card-quiz-${q.id}`}>
                 <div className="flex items-start justify-between gap-2">
@@ -134,6 +139,7 @@ function StudentQuizzes() {
                   {done ? <Badge className="gap-1 bg-green-500 text-white"><CheckCircle2 className="h-3 w-3" /> {t("quiz.done")}</Badge> : <StateBadge state={st} t={t} />}
                 </div>
                 {q.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{q.description}</p>}
+                {!done && <DueBadge dueAt={q.dueAt} className="mt-2 self-start" />}
                 <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
                   <span className="flex items-center gap-1"><FileQuestion className="h-3.5 w-3.5" /> {qs.length} {t("common.questions")}</span>
                   <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {q.durationMinutes} {t("common.min")}</span>
@@ -151,7 +157,7 @@ function StudentQuizzes() {
                   ) : canTake ? (
                     <Link href={`/quizzes/${q.id}/take`}><Button className="w-full gap-2 font-bold" data-testid={`button-take-${q.id}`}><Play className="h-4 w-4" /> {t("quiz.startQuiz")}</Button></Link>
                   ) : (
-                    <Button className="w-full font-bold" disabled variant="outline">{st === "upcoming" ? t("quiz.opens") + " " + fmt(q.startAt, t) : t("quiz.closed")}</Button>
+                    <Button className="w-full font-bold" disabled variant="outline">{pastDue ? t("due.closedButton") : st === "upcoming" ? t("quiz.opens") + " " + fmt(q.startAt, t) : t("quiz.closed")}</Button>
                   )}
                 </div>
               </Card>

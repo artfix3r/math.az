@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { setCurrentUserId, getPersistedUserId, queryClient, apiRequest } from "./queryClient";
+import { queryClient, apiRequest } from "./queryClient";
 
 export type AuthUser = {
   id: number;
@@ -14,35 +14,31 @@ type AuthCtx = {
   user: AuthUser | null;
   loading: boolean;
   login: (u: AuthUser) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
-const Ctx = createContext<AuthCtx>({ user: null, loading: true, login: () => {}, logout: () => {} });
+const Ctx = createContext<AuthCtx>({
+  user: null,
+  loading: true,
+  login: () => {},
+  logout: async () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, try to restore a still-valid persisted session so a page refresh
-  // keeps the user signed in (within the session TTL).
+  // On load, ask the server who we are. If the session cookie is still valid
+  // the user stays signed in across refreshes; otherwise /me returns 401.
   useEffect(() => {
-    const persistedId = getPersistedUserId();
-    if (persistedId == null) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
         const res = await apiRequest("GET", "/api/auth/me");
         const me = (await res.json()) as AuthUser;
-        if (!cancelled && me && typeof me.id === "number") {
-          setCurrentUserId(me.id);
-          setUser(me);
-        }
+        if (!cancelled && me && typeof me.id === "number") setUser(me);
       } catch {
-        // Session no longer valid on the server — clear it.
-        setCurrentUserId(null);
+        // Not signed in.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -52,13 +48,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // The server has already set the session cookie by the time this is called.
   const login = (u: AuthUser) => {
-    setCurrentUserId(u.id);
     setUser(u);
     queryClient.clear();
   };
-  const logout = () => {
-    setCurrentUserId(null);
+  const logout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {
+      // Clear local state even if the request fails.
+    }
     setUser(null);
     queryClient.clear();
   };

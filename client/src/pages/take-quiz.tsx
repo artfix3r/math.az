@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { MathText } from "@/components/math-text";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -130,7 +131,7 @@ export default function TakeQuiz({ id }: { id: number }) {
               <Badge className="bg-primary/15 text-primary">{t(`qtype.${q.type}`)}</Badge>
               <span className="ml-auto text-xs font-bold text-muted-foreground">{q.points} {t("common.points_short")}{q.points > 1 ? "s" : ""}</span>
             </div>
-            <p className="mt-3 whitespace-pre-wrap font-bold">{q.prompt}</p>
+            <p className="mt-3 font-bold"><MathText text={q.prompt} /></p>
 
             {q.type === "photo" && q.imageUrl && (
               <img src={q.imageUrl} alt="Question diagram" className="mt-3 max-h-72 rounded-xl border object-contain" />
@@ -152,7 +153,7 @@ export default function TakeQuiz({ id }: { id: number }) {
                       <span className={cn("flex h-6 w-6 items-center justify-center rounded-full border-2", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
                         <Check className="h-3.5 w-3.5" />
                       </span>
-                      {opt}
+                      <MathText text={opt} />
                     </button>
                   );
                 })}
@@ -196,7 +197,7 @@ export default function TakeQuiz({ id }: { id: number }) {
                       <span className={cn("flex h-6 w-6 items-center justify-center rounded-md border-2", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
                         <Check className="h-3.5 w-3.5" />
                       </span>
-                      {opt}
+                      <MathText text={opt} />
                     </button>
                   );
                 })}

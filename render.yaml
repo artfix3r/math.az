@@ -1,5 +1,6 @@
 # Render Blueprint for math.az
 # When you connect this repo on Render, it reads this file and configures everything.
+# See .env.example for what each variable does.
 services:
   - type: web
     name: math-az
@@ -7,22 +8,33 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
-    healthCheckPath: /
-# ---------------------------------------------------------------------------
-# DATA PERSISTENCE (optional, recommended for real use)
-# The FREE plan has NO persistent disk: the SQLite database resets whenever the
-# instance sleeps or redeploys. Fine for testing. To keep data permanently,
-# upgrade the service to a paid instance and add the block below under the
-# service, plus set DATABASE_PATH=/data/data.db as an env var:
-#
-#   disk:
-#     name: math-az-data
-#     mountPath: /data
-#     sizeGB: 1
-#
-# For production-grade, backed-up storage, a managed database (e.g. Supabase
-# or Postgres) is the more durable choice than a single SQLite file.
-# ---------------------------------------------------------------------------
+      # Postgres connection string (e.g. from Supabase, Neon or Render Postgres).
+      - key: DATABASE_URL
+        sync: false
+      # Signs login cookies; Render generates a random value once.
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
