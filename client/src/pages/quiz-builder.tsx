@@ -21,7 +21,8 @@ import {
   ArrowLeft, Plus, Trash2, GripVertical, ListChecks, FileText, ImageIcon,
   Loader2, Check, Save, ToggleLeft, Type, Hash, CheckSquare,
 } from "lucide-react";
-import { ScanText, Camera } from "lucide-react";
+import { ScanText, Camera, PenLine } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { Quiz, Question, Group } from "@shared/schema";
 
 type QType = "mcq" | "open" | "photo" | "true_false" | "fill_blank" | "numeric" | "multi_select";
@@ -41,6 +42,7 @@ function blank(type: QType): Question {
     points: 1,
     topic: "",
     difficulty: "",
+    allowDrawing: type === "open" || type === "photo",
   };
 }
 function toLocalInput(ts?: number | null) {
@@ -370,6 +372,12 @@ export default function QuizBuilder({ id }: { id?: number }) {
               )}
               {q.type === "photo" && (
                 <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">{t("qb.photoHint")}</p>
+              )}
+              {(q.type === "open" || q.type === "photo") && (
+                <label className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border bg-card px-3 py-2">
+                  <Switch checked={!!q.allowDrawing} onCheckedChange={(v) => update(q.id, { allowDrawing: v })} data-testid={`switch-drawing-${idx}`} />
+                  <span className="flex items-center gap-2 text-sm font-medium"><PenLine className="h-4 w-4 text-muted-foreground" /> {t("qb.allowDrawing")}</span>
+                </label>
               )}
 
               <QuestionMetaRow q={q} index={idx} onChange={(patch) => update(q.id, patch)} />

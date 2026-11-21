@@ -9,7 +9,7 @@ import type { Question } from "./schema";
 // ORIGINAL option order, so the results pages need no special handling.
 
 export type VariantSettings = { pickCount: number; shuffle: boolean };
-type Answers = Record<string, { answer: string | number }>;
+type Answers = Record<string, { answer: string | number; drawing?: string }>;
 
 // Small deterministic PRNG (mulberry32).
 function rng(seed: number) {
@@ -102,7 +102,7 @@ export function gradeAnswers(questions: Question[], answers: Answers) {
       const g = given(a) ? Number(a!.answer) : NaN;
       if (!Number.isNaN(g) && q.correctNumber !== undefined && Math.abs(g - q.correctNumber) <= (q.tolerance ?? 0) + 1e-9)
         score += q.points;
-    } else if (a && String(a.answer ?? "").trim()) {
+    } else if (a && (String(a.answer ?? "").trim() || a.drawing)) {
       needsGrading = 1; // open / photo: graded by the teacher
     }
   }

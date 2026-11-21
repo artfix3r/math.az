@@ -10,10 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Clock, Send, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Clock, Send, Loader2, Check, PenLine } from "lucide-react";
+import { HandwritingPad, STUDENT_INKS } from "@/components/handwriting-pad";
 import type { Quiz, Question } from "@shared/schema";
 
-type Answer = { answer: string | number };
+type Answer = { answer: string | number; drawing?: string };
 
 export default function TakeQuiz({ id }: { id: number }) {
   const { toast } = useToast();
@@ -86,7 +87,10 @@ export default function TakeQuiz({ id }: { id: number }) {
   }, [quiz]);
 
   const setAns = (qid: string, answer: string | number) =>
-    setAnswers((a) => ({ ...a, [qid]: { answer } }));
+    setAnswers((a) => ({ ...a, [qid]: { ...a[qid], answer } }));
+  const setDrawing = (qid: string, drawing: string) =>
+    setAnswers((a) => ({ ...a, [qid]: { answer: a[qid]?.answer ?? "", ...(drawing ? { drawing } : {}) } }));
+  const [handOpen, setHandOpen] = useState<Record<string, boolean>>({});
 
   const toggleMultiAns = (qid: string, oi: number) =>
     setAnswers((a) => {
@@ -106,7 +110,7 @@ export default function TakeQuiz({ id }: { id: number }) {
 
   const isAnswered = (q: Question) => {
     const v = answers[q.id]?.answer;
-    return v !== undefined && String(v) !== "";
+    return (v !== undefined && String(v) !== "") || !!answers[q.id]?.drawing;
   };
   const answeredCount = questions.filter(isAnswered).length;
   const LETTERS = "ABCDEFGH";
@@ -216,7 +220,27 @@ export default function TakeQuiz({ id }: { id: number }) {
               )}
 
               {(q.type === "open" || q.type === "photo") && (
-                <Textarea className="mt-4 min-h-28 text-base" placeholder={t("tq.typeAnswer")} value={(answers[q.id]?.answer as string) ?? ""} onChange={(e) => setAns(q.id, e.target.value)} data-testid={`answer-open-${idx}`} />
+                <>
+                  <Textarea className="mt-4 min-h-28 text-base" placeholder={t("tq.typeAnswer")} value={(answers[q.id]?.answer as string) ?? ""} onChange={(e) => setAns(q.id, e.target.value)} data-testid={`answer-open-${idx}`} />
+                  {q.allowDrawing && (
+                    handOpen[q.id] || answers[q.id]?.drawing ? (
+                      <div className="mt-3">
+                        <p className="mb-1.5 text-sm font-medium">{t("tq.handTitle")}</p>
+                        <HandwritingPad
+                          value={answers[q.id]?.drawing ?? ""}
+                          onChange={(png) => setDrawing(q.id, png)}
+                          colors={STUDENT_INKS(t)}
+                          label={t("tq.handTitle")}
+                          testId={`pad-${idx}`}
+                        />
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" className="mt-3 gap-2" onClick={() => setHandOpen((h) => ({ ...h, [q.id]: true }))} data-testid={`button-hand-${idx}`}>
+                        <PenLine className="h-4 w-4" /> {t("tq.handButton")}
+                      </Button>
+                    )
+                  )}
+                </>
               )}
             </li>
           ))}

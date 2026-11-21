@@ -152,6 +152,8 @@ export const questionSchema = z.object({
   // Used by the question bank and the progress page.
   topic: z.string().max(80).optional().default(""),
   difficulty: z.enum(["", "easy", "medium", "hard"]).optional().default(""),
+  // Open questions: students may also answer by hand (finger or stylus).
+  allowDrawing: z.boolean().optional().default(false),
 });
 
 export const insertQuizSchema = createInsertSchema(quizzes)
@@ -185,6 +187,8 @@ export const submissions = pgTable("submissions", {
   // Teacher's feedback: a note on the whole work, and JSON questionId -> comment.
   feedback: text("feedback").notNull().default(""),
   comments: text("comments").notNull().default("{}"),
+  // JSON questionId -> PNG of the teacher's red-pen marks over the answer.
+  annotations: text("annotations").notNull().default("{}"),
   gradedAt: ts("graded_at"),
   submittedAt: ts("submitted_at").notNull(),
 });

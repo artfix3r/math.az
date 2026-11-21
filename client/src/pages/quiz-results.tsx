@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { HandwritingPad, DrawingView, TEACHER_INKS } from "@/components/handwriting-pad";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +20,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Hourglass, CheckCircle2, Pencil, Plus, Minus, RotateCcw, Bot, Loader2 } from "lucide-react";
+import { ArrowLeft, Hourglass, CheckCircle2, Pencil, Plus, Minus, RotateCcw, Bot, Loader2, PenLine } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
@@ -29,7 +30,7 @@ type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
   gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number; questionIds?: string;
-  comments?: string; feedback?: string;
+  comments?: string; feedback?: string; annotations?: string;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -124,7 +125,7 @@ function isCorrect(q: Question, a: string | number | undefined): boolean | null 
 function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions: Question[]; onGraded: () => void; onReopened: () => void }) {
   const { t } = useT();
   const { toast } = useToast();
-  const answers: Record<string, { answer: string | number }> = JSON.parse(sub.answers || "{}");
+  const answers: Record<string, { answer: string | number; drawing?: string }> = JSON.parse(sub.answers || "{}");
   // With random questions per student, only show the ones this student got.
   const shownIds: Set<string> | null = (() => {
     try { return sub.questionIds ? new Set<string>(JSON.parse(sub.questionIds)) : null; } catch { return null; }
@@ -152,6 +153,10 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
   });
   const [feedback, setFeedback] = useState(sub.feedback ?? "");
   const [open, setOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sub.annotations || "{}") || {}; } catch { return {}; }
+  });
+  const [penOpen, setPenOpen] = useState<Record<string, boolean>>({});
   const total = questions.reduce((acc, q) => acc + (Number(points[q.id]) || 0), 0);
 
   function setQ(id: string, val: number, max: number) {
@@ -210,7 +215,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
   }
 
   const grade = useMutation({
-    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: total, needsGrading: 0, gradedPoints: JSON.stringify(points), comments, feedback }),
+    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: total, needsGrading: 0, gradedPoints: JSON.stringify(points), comments, feedback, annotations }),
     onSuccess: () => { setOpen(false); onGraded(); },
   });
 
@@ -267,9 +272,31 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
                   <p className="mt-1 font-bold"><MathText text={q.prompt} /></p>
                   {q.type === "photo" && q.imageUrl && <img src={q.imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border object-contain" />}
                   {isManual ? (
-                    <div className="mt-2">
+                    <div className="mt-2 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">{t("qr.studentSolution")}</p>
-                      {renderAnswer(q, a)}
+                      {(String(a ?? "").trim() || !answers[q.id]?.drawing) && renderAnswer(q, a)}
+                      {penOpen[q.id] ? (
+                        <div className="rounded-md border border-pen/30 bg-pen/5 p-2">
+                          <p className="mb-1.5 text-sm font-semibold text-pen">{t("qr.penTitle")}</p>
+                          <HandwritingPad
+                            value={annotations[q.id] ?? ""}
+                            onChange={(png) => setAnnotations((x) => { const n = { ...x }; if (png) n[q.id] = png; else delete n[q.id]; return n; })}
+                            background={answers[q.id]?.drawing}
+                            paper
+                            colors={TEACHER_INKS(t)}
+                            label={t("qr.penTitle")}
+                            testId={`teacher-pad-${sub.id}-${q.id}`}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <DrawingView drawing={answers[q.id]?.drawing} annotation={annotations[q.id]} alt={t("qr.studentDrawing")} />
+                          <Button type="button" variant="outline" size="sm" className="gap-1.5 border-pen/40 text-pen hover:bg-pen/5"
+                            onClick={() => setPenOpen((o) => ({ ...o, [q.id]: true }))} data-testid={`button-pen-${sub.id}-${q.id}`}>
+                            <PenLine className="h-4 w-4" /> {answers[q.id]?.drawing ? t("qr.penOnAnswer") : t("qr.penWrite")}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   ) : (
                     renderAnswer(q, a)

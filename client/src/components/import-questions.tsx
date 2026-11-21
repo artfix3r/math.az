@@ -102,7 +102,7 @@ export function ImportQuestionsDialog({
         const withPhoto = d.attachPhoto && !!photoUrl;
         const base = {
           id: uid(), prompt: d.prompt.trim() || t("imp.seePhoto"), imageUrl: withPhoto ? photoUrl : "",
-          points: 1, topic: "", difficulty: "" as const, correctIndexes: [], correctText: "", tolerance: 0,
+          points: 1, topic: "", difficulty: "" as const, correctIndexes: [], correctText: "", tolerance: 0, allowDrawing: true,
         };
         if (d.type === "mcq") {
           const options = d.options.filter((o) => o.trim());

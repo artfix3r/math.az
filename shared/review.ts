@@ -4,7 +4,7 @@ import type { Question } from "./schema";
 
 type Answer = string | number;
 type SubLike = {
-  answers: string; gradedPoints: string; comments: string; questionIds: string;
+  answers: string; gradedPoints: string; comments: string; questionIds: string; annotations?: string;
   needsGrading: number; attemptNumber: number;
 };
 
@@ -20,6 +20,10 @@ export type ReviewItem = {
   awarded: number;
   status: ReviewStatus;
   comment: string;
+  /** The student's hand-written answer (PNG data URL). */
+  drawing?: string;
+  /** The teacher's red-pen marks drawn over it (PNG data URL). */
+  annotation?: string;
   correct?: { index?: number; indexes?: number[]; text?: string; number?: number; tolerance?: number };
 };
 
@@ -55,7 +59,8 @@ export function canRevealAnswers(
 }
 
 export function buildReview(questions: Question[], sub: SubLike, reveal: boolean): ReviewItem[] {
-  const answers = parse<Record<string, { answer: Answer }>>(sub.answers, {});
+  const answers = parse<Record<string, { answer: Answer; drawing?: string }>>(sub.answers, {});
+  const annotations = parse<Record<string, string>>(sub.annotations ?? "", {});
   const graded = parse<Record<string, number>>(sub.gradedPoints, {});
   const comments = parse<Record<string, string>>(sub.comments, {});
   const shown = parse<string[] | null>(sub.questionIds, null);
@@ -72,7 +77,7 @@ export function buildReview(questions: Question[], sub: SubLike, reveal: boolean
       const ok = autoCorrect(q, answer);
       if (ok === null) {
         awarded = 0;
-        status = String(answer).trim() ? "pending" : "wrong";
+        status = String(answer).trim() || answers[q.id]?.drawing ? "pending" : "wrong";
       } else {
         awarded = ok ? q.points : 0;
         status = ok ? "correct" : "wrong";
@@ -82,6 +87,8 @@ export function buildReview(questions: Question[], sub: SubLike, reveal: boolean
       id: q.id, type: q.type, prompt: q.prompt, imageUrl: q.imageUrl ?? "", options: q.options ?? [],
       points: q.points, answer, awarded, status, comment: String(comments[q.id] ?? ""),
     };
+    if (answers[q.id]?.drawing) item.drawing = answers[q.id].drawing;
+    if (annotations[q.id]) item.annotation = annotations[q.id];
     if (reveal) {
       if (q.type === "mcq" || q.type === "true_false") item.correct = { index: q.correctIndex };
       else if (q.type === "multi_select") item.correct = { indexes: q.correctIndexes ?? [] };
