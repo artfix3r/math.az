@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { MathEditor, MathText } from "@/components/math-text";
+import { AddFromBank, QuestionMetaRow } from "@/components/question-bank";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,6 +36,8 @@ function blank(type: QType): Question {
     correctNumber: undefined,
     tolerance: 0,
     points: 1,
+    topic: "",
+    difficulty: "",
   };
 }
 function toLocalInput(ts?: number | null) {
@@ -57,6 +61,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
   const [duration, setDuration] = useState(30);
   const [startAt, setStartAt] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(1);
+  const [pickCount, setPickCount] = useState(0);
+  const [shuffle, setShuffle] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([blank("mcq")]);
 
   useEffect(() => {
@@ -67,6 +73,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
       setDuration(existing.durationMinutes);
       setStartAt(toLocalInput(existing.startAt));
       setMaxAttempts((existing as any).maxAttempts ?? 1);
+      setPickCount(existing.pickCount ?? 0);
+      setShuffle(!!existing.shuffle);
       const qs: Question[] = JSON.parse(existing.questions || "[]");
       if (qs.length) setQuestions(qs);
     }
@@ -92,6 +100,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
         groupId: groupId === "none" ? null : Number(groupId),
         durationMinutes: Number(duration),
         maxAttempts: Math.max(0, Number(maxAttempts) || 0),
+        pickCount: pickCount > 0 && pickCount < questions.length ? Math.floor(pickCount) : 0,
+        shuffle: shuffle ? 1 : 0,
         startAt: startAt ? new Date(startAt).getTime() : null,
         questions: JSON.stringify(questions.map((q) => ({ ...q, points: Number(q.points) || 1 }))),
         isTemplate: 0,
@@ -180,6 +190,20 @@ export default function QuizBuilder({ id }: { id?: number }) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")}</p>
+        <div className="grid gap-4 rounded-xl border border-dashed p-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="font-bold">{t("variant.pickCount")}</Label>
+            <Input type="number" min={0} max={questions.length} value={pickCount} onChange={(e) => setPickCount(Math.max(0, Number(e.target.value) || 0))} className="w-28" data-testid="input-pick-count" />
+            <p className="text-xs text-muted-foreground">{t("variant.pickHint", { total: questions.length })}</p>
+          </div>
+          <div className="flex items-start gap-2 pt-7">
+            <Checkbox id="shuffle" checked={shuffle} onCheckedChange={(v) => setShuffle(v === true)} data-testid="checkbox-shuffle" />
+            <div>
+              <Label htmlFor="shuffle" className="font-bold">{t("variant.shuffle")}</Label>
+              <p className="text-xs text-muted-foreground">{t("variant.shuffleHint")}</p>
+            </div>
+          </div>
+        </div>
         <p className="text-xs text-muted-foreground">{t("qb.anytimeHint", { points: totalPoints, count: questions.length })}</p>
       </Card>
 
@@ -336,6 +360,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
                 <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">{t("qb.photoHint")}</p>
               )}
 
+              <QuestionMetaRow q={q} index={idx} onChange={(patch) => update(q.id, patch)} />
+
               <div className="flex items-center gap-2">
                 <Label className="text-sm font-bold">{t("common.points")}</Label>
                 <Input type="number" min={1} value={q.points} onChange={(e) => update(q.id, { points: Number(e.target.value) })} className="w-24" data-testid={`input-points-${idx}`} />
@@ -355,6 +381,8 @@ export default function QuizBuilder({ id }: { id?: number }) {
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("numeric")} data-testid="button-add-numeric"><Hash className="h-4 w-4" /> {t("qtype.numeric")}</Button>
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("open")} data-testid="button-add-open"><FileText className="h-4 w-4" /> {t("qtype.open")}</Button>
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("photo")} data-testid="button-add-photo"><ImageIcon className="h-4 w-4" /> {t("qtype.photo")}</Button>
+        <span className="mx-1 h-6 w-px bg-border" />
+        <AddFromBank onAdd={(qs) => setQuestions((cur) => [...cur.filter((q) => q.prompt.trim()), ...qs])} />
       </Card>
     </div>
   );

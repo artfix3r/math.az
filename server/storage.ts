@@ -1,16 +1,16 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
-  materials, materialGroups, passwordResetTokens,
+  materials, materialGroups, passwordResetTokens, bankQuestions,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
   Quiz, InsertQuiz, Submission, InsertSubmission,
   ClassSession, InsertSession, Feedback, InsertFeedback,
-  Material, InsertMaterial, MaterialGroup, PasswordResetToken,
+  Material, InsertMaterial, MaterialGroup, PasswordResetToken, BankQuestion,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -147,6 +147,20 @@ ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+-- Question bank and per-student quiz variants.
+CREATE TABLE IF NOT EXISTS bank_questions (
+  id SERIAL PRIMARY KEY,
+  teacher_id INTEGER NOT NULL,
+  question TEXT NOT NULL,
+  topic TEXT NOT NULL DEFAULT '',
+  difficulty TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS bank_questions_teacher ON bank_questions (teacher_id);
+ALTER TABLE bank_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pick_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS question_ids TEXT NOT NULL DEFAULT '';
 ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
@@ -197,6 +211,11 @@ export interface IStorage {
   getSubmission(quizId: number, studentId: number): Promise<Submission | undefined>;
   getSubmissionById(id: number): Promise<Submission | undefined>;
   deleteSubmission(id: number): Promise<void>;
+  // question bank
+  listBank(teacherId: number, filter: { topic?: string; difficulty?: string }): Promise<BankQuestion[]>;
+  addToBank(teacherId: number, question: string, topic: string, difficulty: string): Promise<BankQuestion>;
+  getBankQuestion(id: number): Promise<BankQuestion | undefined>;
+  deleteBankQuestion(id: number): Promise<void>;
   // feedback
   createFeedback(f: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
@@ -368,6 +387,25 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteSubmission(id: number) {
     await db.delete(submissions).where(eq(submissions.id, id));
+  }
+
+  // ---- question bank ----
+  async listBank(teacherId: number, filter: { topic?: string; difficulty?: string }) {
+    const conds = [eq(bankQuestions.teacherId, teacherId)];
+    if (filter.topic) conds.push(eq(bankQuestions.topic, filter.topic));
+    if (filter.difficulty) conds.push(eq(bankQuestions.difficulty, filter.difficulty));
+    return db.select().from(bankQuestions).where(and(...conds)).orderBy(desc(bankQuestions.createdAt));
+  }
+  async addToBank(teacherId: number, question: string, topic: string, difficulty: string) {
+    const rows = await db.insert(bankQuestions).values({ teacherId, question, topic, difficulty, createdAt: Date.now() }).returning();
+    return rows[0];
+  }
+  async getBankQuestion(id: number) {
+    const rows = await db.select().from(bankQuestions).where(eq(bankQuestions.id, id));
+    return rows[0];
+  }
+  async deleteBankQuestion(id: number) {
+    await db.delete(bankQuestions).where(eq(bankQuestions.id, id));
   }
 
   // ---- feedback ----

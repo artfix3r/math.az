@@ -120,6 +120,10 @@ export const quizzes = pgTable("quizzes", {
   maxAttempts: integer("max_attempts").notNull().default(1), // 0 = unlimited
   startAt: ts("start_at"), // epoch ms; null for templates
   isTemplate: integer("is_template").notNull().default(0), // 1 = library/backup item
+  // Per-student variants (shared/quiz-variants.ts): give each student this many
+  // random questions (0 = all) and/or shuffle question and option order.
+  pickCount: integer("pick_count").notNull().default(0),
+  shuffle: integer("shuffle").notNull().default(0),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -143,6 +147,9 @@ export const questionSchema = z.object({
   correctNumber: z.number().optional(),
   tolerance: z.number().optional().default(0),
   points: z.number().default(1),
+  // Used by the question bank and the progress page.
+  topic: z.string().max(80).optional().default(""),
+  difficulty: z.enum(["", "easy", "medium", "hard"]).optional().default(""),
 });
 
 export const insertQuizSchema = createInsertSchema(quizzes)
@@ -171,6 +178,8 @@ export const submissions = pgTable("submissions", {
   // 1 if the quiz was auto-submitted (e.g. student switched tabs). Shown to teacher.
   autoSubmitted: integer("auto_submitted").notNull().default(0),
   attemptNumber: integer("attempt_number").notNull().default(1),
+  // JSON array of the question ids this student was shown ("" = all of them).
+  questionIds: text("question_ids").notNull().default(""),
   submittedAt: ts("submitted_at").notNull(),
 });
 
@@ -275,3 +284,16 @@ export const materialGroups = pgTable("material_groups", {
 
 export const insertMaterialGroupSchema = createInsertSchema(materialGroups).omit({ id: true });
 export type MaterialGroup = typeof materialGroups.$inferSelect;
+
+// ---------------- Question bank ----------------
+// A teacher's saved questions, reusable across quizzes. `question` is the
+// question JSON (questionSchema); topic/difficulty are copied out for filtering.
+export const bankQuestions = pgTable("bank_questions", {
+  id: serial("id").primaryKey(),
+  teacherId: integer("teacher_id").notNull(),
+  question: text("question").notNull(),
+  topic: text("topic").notNull().default(""),
+  difficulty: text("difficulty").notNull().default(""),
+  createdAt: ts("created_at").notNull(),
+});
+export type BankQuestion = typeof bankQuestions.$inferSelect;

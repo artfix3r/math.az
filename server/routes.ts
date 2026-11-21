@@ -16,6 +16,7 @@ import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, isEmailConfigured } from "./mailer";
 import { readSessionUserId, setSession, clearSession } from "./session";
 import { attachErrorCodes, zodErrorBody } from "./errors";
+import { buildVariant, gradeAnswers, answersToOriginal, variantSeed } from "@shared/quiz-variants";
 import {
   isStorageEnabled, publicStorageConfig, createUploadUrl, createDownloadUrl,
   removeFiles, teacherPrefix, MAX_UPLOAD_BYTES,
@@ -115,11 +116,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const g = await storage.getGroup(Number(groupId));
     return !!g && g.teacherId === user.id;
   }
-  // Remove answer keys before sending a quiz to a student.
-  function stripAnswers(quiz: Quiz) {
+  // The questions this student gets (random pick / shuffled), with answers.
+  function studentVariant(quiz: Quiz, studentId: number) {
     let questions: Question[] = [];
     try { questions = JSON.parse(quiz.questions || "[]"); } catch { /* keep empty */ }
-    const safe = questions.map(({ correctIndex, correctIndexes, correctText, correctNumber, tolerance, ...rest }) => rest);
+    const variant = buildVariant(questions, { pickCount: quiz.pickCount ?? 0, shuffle: !!quiz.shuffle }, variantSeed(quiz.id, studentId));
+    return { questions, variant };
+  }
+  // The student's variant with the answer keys removed.
+  function quizForStudent(quiz: Quiz, studentId: number) {
+    const { variant } = studentVariant(quiz, studentId);
+    const safe = variant.map(({ correctIndex, correctIndexes, correctText, correctNumber, tolerance, optionOrder, ...rest }) => rest);
     return { ...quiz, questions: JSON.stringify(safe) };
   }
 
@@ -333,7 +340,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const quizzes = await storage.getQuizzesForStudent(user.id);
       const withState = await Promise.all(quizzes.map(async (q) => {
         const sub = await storage.getSubmission(q.id, user.id);
-        return { ...q, submission: sub ? { score: sub.score, maxScore: sub.maxScore, needsGrading: sub.needsGrading } : null };
+        // Never send answer keys to students: use their own variant, stripped.
+        return { ...quizForStudent(q, user.id), submission: sub ? { score: sub.score, maxScore: sub.maxScore, needsGrading: sub.needsGrading } : null };
       }));
       res.json(withState);
     }
@@ -353,7 +361,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.json(quiz);
     }
     if (!(await studentCanSeeQuiz(user, quiz))) return notFound(res, "Quiz");
-    res.json(stripAnswers(quiz));
+    res.json(quizForStudent(quiz, user.id));
   });
 
   function validateQuestions(raw: string): string {
@@ -445,51 +453,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const autoSubmitted = req.body.autoSubmitted ? 1 : 0;
 
     const answers = (req.body.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, { answer: string | number }>;
-    const questions: Question[] = JSON.parse(quiz.questions);
-    let score = 0, maxScore = 0, needsGrading = 0;
-    for (const q of questions) {
-      maxScore += q.points;
-      const a = answers[q.id];
-      if (q.type === "mcq" || q.type === "true_false") {
-        // single correct index
-        if (a && a.answer !== "" && a.answer !== undefined && Number(a.answer) === q.correctIndex)
-          score += q.points;
-      } else if (q.type === "multi_select") {
-        // answer is a comma-separated list of selected indexes; exact set match
-        const selected = new Set(
-          a && a.answer !== "" && a.answer !== undefined
-            ? String(a.answer).split(",").filter((x) => x !== "").map((x) => Number(x))
-            : []
-        );
-        const correct = new Set((q.correctIndexes ?? []).map((x) => Number(x)));
-        if (
-          selected.size === correct.size &&
-          Array.from(selected).every((x) => correct.has(x))
-        )
-          score += q.points;
-      } else if (q.type === "fill_blank") {
-        // case-insensitive trimmed match
-        const given = a ? String(a.answer ?? "").trim().toLowerCase() : "";
-        if (given && given === String(q.correctText ?? "").trim().toLowerCase())
-          score += q.points;
-      } else if (q.type === "numeric") {
-        // within tolerance of correctNumber
-        const given = a && a.answer !== "" && a.answer !== undefined ? Number(a.answer) : NaN;
-        const target = q.correctNumber;
-        const tol = q.tolerance ?? 0;
-        if (!Number.isNaN(given) && target !== undefined && Math.abs(given - target) <= tol)
-          score += q.points;
-      } else {
-        // open / photo -> manual grading
-        if (a && String(a.answer ?? "").trim()) needsGrading = 1;
-      }
-    }
+    // Grade against this student's variant, then store answers in the
+    // original option order so results pages read them directly.
+    const { questions, variant } = studentVariant(quiz, user.id);
+    const { score, maxScore, needsGrading } = gradeAnswers(variant, answers);
+    const stored = answersToOriginal(questions, variant, answers);
+    const questionIds = variant.length === questions.length ? "" : JSON.stringify(variant.map((q) => q.id));
     // If a prior attempt exists (e.g. teacher reopened with higher maxAttempts),
     // replace it so the latest attempt is the one of record.
     if (existing) await storage.deleteSubmission(existing.id);
     const sub = await storage.createSubmission({
-      quizId: quiz.id, studentId: user.id, answers: JSON.stringify(answers),
-      score, maxScore, needsGrading, autoSubmitted, attemptNumber, submittedAt: Date.now(),
+      quizId: quiz.id, studentId: user.id, answers: JSON.stringify(stored),
+      score, maxScore, needsGrading, autoSubmitted, attemptNumber, questionIds, submittedAt: Date.now(),
     });
     res.json(sub);
   });
@@ -864,6 +839,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(404).json({ message: "Material not found" });
     const paths = await storage.deleteMaterial(id);
     await removeFiles(paths);
+    res.json({ ok: true });
+  });
+
+  // ---- Question bank (teachers only, each teacher sees only their own) ----
+  app.get("/api/bank", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const topic = typeof req.query.topic === "string" ? req.query.topic : "";
+    const difficulty = typeof req.query.difficulty === "string" ? req.query.difficulty : "";
+    res.json(await storage.listBank(user.id, { topic, difficulty }));
+  });
+
+  app.get("/api/bank/topics", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    // Topics from the bank and from the teacher's quizzes, for suggestions.
+    const topics = new Set<string>();
+    for (const b of await storage.listBank(user.id, {})) if (b.topic) topics.add(b.topic);
+    for (const quiz of await storage.getQuizzesByTeacher(user.id)) {
+      try {
+        for (const q of JSON.parse(quiz.questions || "[]") as Question[]) if (q.topic) topics.add(q.topic);
+      } catch { /* ignore bad JSON */ }
+    }
+    res.json(Array.from(topics).sort((a, b) => a.localeCompare(b, "az")));
+  });
+
+  app.post("/api/bank", requireUser, requireTeacher, async (req, res) => {
+    try {
+      const user = (req as any).user as User;
+      const question = questionSchema.parse(req.body?.question);
+      res.json(await storage.addToBank(user.id, JSON.stringify(question), question.topic ?? "", question.difficulty ?? ""));
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
+      res.status(500).json({ message: "Could not process the request" });
+    }
+  });
+
+  app.delete("/api/bank/:id", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const b = await storage.getBankQuestion(Number(req.params.id));
+    if (!b || b.teacherId !== user.id) return notFound(res, "Question");
+    await storage.deleteBankQuestion(b.id);
     res.json({ ok: true });
   });
 

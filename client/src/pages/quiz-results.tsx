@@ -26,7 +26,7 @@ import type { Quiz, Question } from "@shared/schema";
 type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
-  gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number;
+  gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number; questionIds?: string;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -122,6 +122,10 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
   const { t } = useT();
   const { toast } = useToast();
   const answers: Record<string, { answer: string | number }> = JSON.parse(sub.answers || "{}");
+  // With random questions per student, only show the ones this student got.
+  const shownIds: Set<string> | null = (() => {
+    try { return sub.questionIds ? new Set<string>(JSON.parse(sub.questionIds)) : null; } catch { return null; }
+  })();
 
   // Per-question awarded points. If this submission was already graded, reload the
   // teacher's saved per-question points so re-opening the dialog shows their work.
@@ -235,7 +239,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
           <DialogHeader><DialogTitle>{t("qr.grade")} — {sub.studentName}</DialogTitle></DialogHeader>
           <p className="-mt-1 text-sm text-muted-foreground">{t("qr.gradeHint")}</p>
           <div className="space-y-4">
-            {questions.map((q, idx) => {
+            {questions.filter((q) => shownIds === null || shownIds.has(q.id)).map((q, idx) => {
               const a = answers[q.id]?.answer;
               const c = isCorrect(q, a);
               const isManual = c === null;
