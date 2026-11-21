@@ -15,7 +15,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, Mail, ArrowLeft, MessageSquareHeart } from "lucide-react";
 
-const CONTACT_EMAIL = "yusifimam2019@gmail.com";
+// Public contact address: left empty until the owner provides one; the card hides itself.
+const CONTACT_EMAIL = "";
 type Category = "suggestion" | "bug" | "other";
 
 export default function Feedback() {
@@ -140,6 +141,7 @@ export default function Feedback() {
         </Card>
 
         {/* Contact details (#4) */}
+        {CONTACT_EMAIL && (
         <Card className="mt-4 border-2 p-5">
           <p className="text-sm font-medium text-muted-foreground">{t("fb.contactTitle")}</p>
           <div className="mt-3 flex items-center gap-3">
@@ -158,6 +160,7 @@ export default function Feedback() {
             </div>
           </div>
         </Card>
+        )}
       </div>
     </div>
   );
