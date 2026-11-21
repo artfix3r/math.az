@@ -104,15 +104,25 @@ export function mathify(text: string): string {
  * Applied only to text that came from a photo or scan.
  */
 export function repairOcr(text: string): string {
+  // Angle questions: the reader turns ° into 9, 7, ”, " or ?. Decided for the
+  // whole text, because answer lines like "A) 659 B) 62?" carry no angle words.
+  const angles = /buca[qğ]|dərəcə|°|угол|градус|angle|degree/i.test(text);
+  const deg = (s: string) => s
+    // "1247”" -> "124°" (the sign read as a digit plus a quote)
+    .replace(/(?<!\d)(\d{1,3})[79][”“"'’](?!\d)/g, (m, a) => (Number(a) <= 360 ? `${a}°` : m))
+    // "26”", "62?", "80º" -> "26°"
+    .replace(/(?<!\d)(\d{1,3})\s?[”“"'’?º˚](?!\d)/g, (m, a) => (Number(a) <= 360 ? `${a}°` : m))
+    // "6597" -> "65°" (the sign read as two digits)
+    .replace(/(?<![\d.,])(\d{1,3})(?:97|99|79|77)(?![\d%])(?![.,]\d)/g, (m, a) => (Number(m) > 360 && Number(a) <= 360 ? `${a}°` : m))
+    // "659" where 659 can't be an angle -> "65°"
+    .replace(/(?<![\d.,])(\d{1,3})9(?![\d%])(?![.,]\d)/g, (m, a) => (Number(m) > 360 && Number(a) <= 360 ? `${a}°` : m));
   return text
     .split("\n")
     .filter((line) => new RegExp(`[${L}\\d]`).test(line) || line.trim() === "")
     .map((line) => {
       let l = line.replace(/^(\s*)[$S§]\s*[.,]\s+/, "$15. ");
       l = l.replace(/(\d{1,3})96(?=-[A-Za-zƏəIıÖöÜüĞğŞşÇç])/g, "$1%");
-      if (/buca[qğ]|dərəcə|угол|angle/i.test(l)) {
-        l = l.replace(/\b(\d{1,3})9\b/g, (m, a) => (Number(m) > 180 ? `${a}°` : m));
-      }
+      if (angles) l = deg(l);
       l = l.replace(/\b(sm|dm|mm|km|m|см|дм|мм|км|м)\s?[?:"”’](?=\s|,|$)/g, "$1²");
       return l;
     })
