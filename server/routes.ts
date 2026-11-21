@@ -15,6 +15,7 @@ import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
 import { remindersToSend, REMINDER_WINDOW_MS } from "@shared/deadlines";
+import { computeProgress } from "@shared/progress";
 import { timingSafeEqual } from "node:crypto";
 import { readSessionUserId, setSession, clearSession } from "./session";
 import { attachErrorCodes, zodErrorBody } from "./errors";
@@ -844,6 +845,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const paths = await storage.deleteMaterial(id);
     await removeFiles(paths);
     res.json({ ok: true });
+  });
+
+  // ---- Progress (scores over time, strengths by topic) ----
+  // onlyTeacherId limits it to that teacher's quizzes (a student can be in
+  // several teachers' groups; each teacher sees only their own quizzes).
+  async function progressFor(studentId: number, onlyTeacherId?: number) {
+    const subs = await storage.getSubmissionsByStudent(studentId);
+    const quizzes: Quiz[] = [];
+    for (const id of Array.from(new Set(subs.map((s) => s.quizId)))) {
+      const q = await storage.getQuiz(id);
+      if (q && (onlyTeacherId === undefined || q.teacherId === onlyTeacherId)) quizzes.push(q);
+    }
+    return computeProgress(quizzes, subs);
+  }
+  // Is this student in one of this teacher's groups?
+  async function teachesStudent(teacherId: number, studentId: number) {
+    for (const g of await storage.getGroupsByTeacher(teacherId)) if (await storage.isMember(g.id, studentId)) return true;
+    return false;
+  }
+
+  app.get("/api/progress", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    res.json(await progressFor(user.id));
+  });
+
+  app.get("/api/students/:id/progress", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const student = await storage.getUser(Number(req.params.id));
+    if (!student || student.role !== "student" || !(await teachesStudent(user.id, student.id)))
+      return notFound(res, "Student");
+    res.json({ student: { id: student.id, fullName: student.fullName }, ...(await progressFor(student.id, user.id)) });
   });
 
   // ---- Homework reminders ----

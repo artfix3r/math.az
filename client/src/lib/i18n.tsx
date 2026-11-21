@@ -556,6 +556,33 @@ const en: Dict = {
   "due.closedButton": "Deadline passed",
   "due.bannerTitle": "Homework due within 24 hours: {n}",
   "err.deadline_passed": "The deadline for this quiz has passed.",
+  // --- Progress ---
+  "nav.progress": "My progress",
+  "prog.title": "My progress",
+  "prog.sub": "How your scores change over time and which topics need more practice.",
+  "prog.teacherSub": "Progress on your quizzes.",
+  "prog.back": "Back",
+  "prog.empty": "No finished quizzes yet. Results will appear here after the first quiz.",
+  "prog.average": "Average score",
+  "prog.quizzesDone": "Quizzes done",
+  "prog.needsWork": "Needs more practice",
+  "prog.nothingWeak": "Nothing — well done!",
+  "prog.chartTitle": "Score per quiz",
+  "prog.pendingNote": "{n} quiz(zes) still being graded by the teacher; their score may go up.",
+  "prog.score": "Score",
+  "prog.showTable": "Show as table",
+  "prog.hideTable": "Hide table",
+  "prog.colQuiz": "Quiz",
+  "prog.colDate": "Date",
+  "prog.topicsTitle": "Topics",
+  "prog.topicsHint": "Weakest first. Written answers count once the teacher has graded them.",
+  "prog.noTopic": "No topic",
+  "prog.level.strong": "Strong",
+  "prog.level.ok": "Okay",
+  "prog.level.weak": "Needs work",
+  "prog.trend.up": "Improving",
+  "prog.trend.down": "Slipping",
+  "prog.trend.steady": "Steady",
 };
 
 const az: Dict = {
@@ -1088,6 +1115,33 @@ const az: Dict = {
   "due.closedButton": "Son tarix keçib",
   "due.bannerTitle": "24 saat ərzində təhvil verilməli ev tapşırığı: {n}",
   "err.deadline_passed": "Bu testin son tarixi keçib.",
+  // --- Progress ---
+  "nav.progress": "İnkişafım",
+  "prog.title": "İnkişafım",
+  "prog.sub": "Nəticələrinizin zamanla necə dəyişdiyi və hansı mövzularda daha çox məşq lazım olduğu.",
+  "prog.teacherSub": "Sizin testlərinizdəki inkişaf.",
+  "prog.back": "Geri",
+  "prog.empty": "Hələ bitmiş test yoxdur. İlk testdən sonra nəticələr burada görünəcək.",
+  "prog.average": "Orta nəticə",
+  "prog.quizzesDone": "Həll edilmiş testlər",
+  "prog.needsWork": "Daha çox məşq lazımdır",
+  "prog.nothingWeak": "Heç nə — afərin!",
+  "prog.chartTitle": "Hər testin nəticəsi",
+  "prog.pendingNote": "{n} test hələ müəllim tərəfindən yoxlanılır; nəticə arta bilər.",
+  "prog.score": "Nəticə",
+  "prog.showTable": "Cədvəl kimi göstər",
+  "prog.hideTable": "Cədvəli gizlət",
+  "prog.colQuiz": "Test",
+  "prog.colDate": "Tarix",
+  "prog.topicsTitle": "Mövzular",
+  "prog.topicsHint": "Ən zəifləri əvvəldə. Yazılı cavablar müəllim yoxladıqdan sonra hesablanır.",
+  "prog.noTopic": "Mövzusuz",
+  "prog.level.strong": "Güclü",
+  "prog.level.ok": "Normal",
+  "prog.level.weak": "Məşq lazımdır",
+  "prog.trend.up": "Yaxşılaşır",
+  "prog.trend.down": "Zəifləyir",
+  "prog.trend.steady": "Sabit",
 };
 
 const ru: Dict = {
@@ -1620,6 +1674,33 @@ const ru: Dict = {
   "due.closedButton": "Срок прошёл",
   "due.bannerTitle": "Домашние задания со сроком в ближайшие 24 часа: {n}",
   "err.deadline_passed": "Срок сдачи этого теста прошёл.",
+  // --- Progress ---
+  "nav.progress": "Мой прогресс",
+  "prog.title": "Мой прогресс",
+  "prog.sub": "Как меняются ваши результаты и каким темам нужно больше практики.",
+  "prog.teacherSub": "Прогресс по вашим тестам.",
+  "prog.back": "Назад",
+  "prog.empty": "Пока нет завершённых тестов. Результаты появятся после первого теста.",
+  "prog.average": "Средний результат",
+  "prog.quizzesDone": "Пройдено тестов",
+  "prog.needsWork": "Нужно больше практики",
+  "prog.nothingWeak": "Ничего — молодец!",
+  "prog.chartTitle": "Результат по тестам",
+  "prog.pendingNote": "{n} тест(а) ещё проверяет учитель; результат может вырасти.",
+  "prog.score": "Результат",
+  "prog.showTable": "Показать таблицей",
+  "prog.hideTable": "Скрыть таблицу",
+  "prog.colQuiz": "Тест",
+  "prog.colDate": "Дата",
+  "prog.topicsTitle": "Темы",
+  "prog.topicsHint": "Сначала самые слабые. Письменные ответы учитываются после проверки учителем.",
+  "prog.noTopic": "Без темы",
+  "prog.level.strong": "Сильная",
+  "prog.level.ok": "Нормально",
+  "prog.level.weak": "Нужна практика",
+  "prog.trend.up": "Улучшается",
+  "prog.trend.down": "Ухудшается",
+  "prog.trend.steady": "Стабильно",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };
@@ -1667,14 +1748,19 @@ export const getCurrentLang = () => currentLang;
 
 const LOCALES: Record<Lang, string> = { en: "en-GB", az: "az-AZ", ru: "ru-RU" };
 
+// Azerbaijani names, built in: not every browser ships Azerbaijani date data.
+const AZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avqust", "sentyabr", "oktyabr", "noyabr", "dekabr"];
+const AZ_WEEKDAYS = ["bazar", "bazar ertəsi", "çərşənbə axşamı", "çərşənbə", "cümə axşamı", "cümə", "şənbə"];
+
 /** A date and time written in the site's language, e.g. "22 noyabr, şənbə 14:30". */
 export function formatDateTime(ts: number, lang: Lang = currentLang): string {
-  // Date and time are formatted separately: some locales (az) otherwise join
-  // them with odd separators like "/".
   const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (lang === "az") return `${d.getDate()} ${AZ_MONTHS[d.getMonth()]}, ${AZ_WEEKDAYS[d.getDay()]} ${hh}:${mm}`;
+  // Date and time separately: joined formats vary oddly between locales.
   const date = new Intl.DateTimeFormat(LOCALES[lang], { weekday: "long", day: "numeric", month: "long" }).format(d);
-  const time = new Intl.DateTimeFormat(LOCALES[lang], { hour: "2-digit", minute: "2-digit" }).format(d);
-  return `${date} ${time}`;
+  return `${date} ${hh}:${mm}`;
 }
 
 type I18nCtx = {

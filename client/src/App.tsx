@@ -25,6 +25,7 @@ import Feedback from "@/pages/feedback";
 import ResetPassword from "@/pages/reset-password";
 import { AppShell } from "@/pages/shell";
 import PrintQuiz from "@/pages/print-quiz";
+import { MyProgress, StudentProgress } from "@/pages/progress";
 import { Loader2 } from "lucide-react";
 
 function ThemeInit() {
@@ -71,6 +72,8 @@ function AppRouter() {
       <Route path="/materials">{() => <Protected><Materials /></Protected>}</Route>
       <Route path="/analytics">{() => <Protected><Analytics /></Protected>}</Route>
       <Route path="/sessions">{() => <Protected><Sessions /></Protected>}</Route>
+      <Route path="/progress">{() => <Protected><MyProgress /></Protected>}</Route>
+      <Route path="/students/:id/progress">{(p) => <Protected><StudentProgress id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
       <Route path="/feedback" component={Feedback} />
       <Route path="/reset-password/:token">{(p) => <ResetPassword token={p.token} />}</Route>

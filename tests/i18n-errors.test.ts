@@ -54,3 +54,16 @@ test("dates are written in the site's language", async () => {
   assert.match(formatDateTime(ts, "ru"), /ноя/i);
   assert.match(formatDateTime(ts, "en"), /Nov/);
 });
+
+test("Azerbaijani dates don't depend on the browser having Azerbaijani data", async () => {
+  const { formatDateTime } = await import("../client/src/lib/i18n");
+  const real = Intl.DateTimeFormat;
+  // Simulate a browser without "az" data: it falls back to English month names.
+  (Intl as any).DateTimeFormat = function (loc: string, o: any) { return new real(String(loc).startsWith("az") ? "en-US" : loc, o); };
+  try {
+    const ts = new Date(2026, 10, 22, 14, 30).getTime();
+    assert.equal(formatDateTime(ts, "az"), "22 noyabr, bazar 14:30");
+  } finally {
+    (Intl as any).DateTimeFormat = real;
+  }
+});
