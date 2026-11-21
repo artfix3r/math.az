@@ -103,3 +103,19 @@ test("units with squares stay as they are", () => {
   assert.equal(mathify("96 sm² və 3 m³"), "96 sm² və 3 m³");
   assert.equal(mathify("a² + b²"), "$a^{2}$ + $b^{2}$");
 });
+
+test("OCR repair: degree signs in an angle question, including its answer options", () => {
+  const ocr = "1247”-li bucağın təpə nöqtəsindən çıxan şüa onu dərəcə\nölçülərinin fərqi 26” olan iki bucağa bölür. Böyük bucağın qiymətini tapın.\nA) 659 B) 62? C) 80? D) 55? E) 75?";
+  assert.equal(
+    repairOcr(ocr),
+    "124°-li bucağın təpə nöqtəsindən çıxan şüa onu dərəcə\nölçülərinin fərqi 26° olan iki bucağa bölür. Böyük bucağın qiymətini tapın.\nA) 65° B) 62° C) 80° D) 55° E) 75°",
+  );
+});
+
+test("OCR repair: question marks stay when the text is not about angles", () => {
+  assert.equal(repairOcr("Kitab neçə səhifədir? 240?"), "Kitab neçə səhifədir? 240?");
+});
+
+test("OCR repair: degree sign read as two digits", () => {
+  assert.equal(repairOcr("Bucaq: A) 6597 B)62° C) 1809"), "Bucaq: A) 65° B)62° C) 180°");
+});
