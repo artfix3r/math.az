@@ -1,4 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Sigma } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FormulaDialog } from "./formula-dialog";
+import { RichMathInput, type RichMathHandle } from "./rich-math-input";
 import { renderMathHtml } from "@/lib/math";
 import { Textarea } from "@/components/ui/textarea";
 import { useT } from "@/lib/i18n";
@@ -10,29 +14,40 @@ export function MathText({ text, className }: { text: string; className?: string
   return <span className={cn("math-text", className)} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-// Snippets for the formula toolbar. `|` marks where the cursor goes.
-const SNIPPETS: { label: string; insert: string; title: string }[] = [
-  { label: "a/b", insert: "$\\frac{|}{}$", title: "fraction" },
-  { label: "x²", insert: "$x^{|}$", title: "power" },
-  { label: "√", insert: "$\\sqrt{|}$", title: "sqrt" },
-  { label: "ⁿ√", insert: "$\\sqrt[n]{|}$", title: "root" },
-  { label: "x₁", insert: "$x_{|}$", title: "index" },
-  { label: "π", insert: "$\\pi$|", title: "pi" },
-  { label: "≤", insert: "$\\le$|", title: "le" },
-  { label: "≥", insert: "$\\ge$|", title: "ge" },
-  { label: "≠", insert: "$\\ne$|", title: "ne" },
-  { label: "±", insert: "$\\pm$|", title: "pm" },
-  { label: "·", insert: "$\\cdot$|", title: "dot" },
-  { label: "°", insert: "$^\\circ$|", title: "degree" },
-  { label: "∠", insert: "$\\angle $|", title: "angle" },
-  { label: "|x|", insert: "$|{|}|$", title: "abs" },
-  { label: "log", insert: "$\\log_{|}{}$", title: "log" },
-  { label: "sin", insert: "$\\sin |$", title: "sin" },
-  { label: "∫", insert: "$\\int_{|}^{} \\, dx$", title: "integral" },
-  { label: "∑", insert: "$\\sum_{i=1}^{|}$", title: "sum" },
+// Quick buttons above the question box. Each opens the formula editor with
+// that shape ready to fill in, so nobody has to know LaTeX.
+const QUICK: { label: string; template: string; title: string }[] = [
+  { label: "a⁄b", template: "\\frac{#?}{#?}", title: "fraction" },
+  { label: "x²", template: "#?^{#?}", title: "power" },
+  { label: "√", template: "\\sqrt{#?}", title: "sqrt" },
+  { label: "x₁", template: "#?_{#?}", title: "index" },
+  { label: "π", template: "\\pi", title: "pi" },
+  { label: "≤", template: "\\le", title: "le" },
+  { label: "°", template: "#?^{\\circ}", title: "degree" },
 ];
 
-/** A textarea for question text with a formula toolbar and a live preview. */
+type EditState = { initial: string; template?: string; save: (latex: string | null) => void } | null;
+
+function useFormulaEditing() {
+  const [edit, setEdit] = useState<EditState>(null);
+  const dialog = (
+    <FormulaDialog
+      open={!!edit}
+      onOpenChange={(v) => { if (!v) setEdit(null); }}
+      initial={edit?.initial ?? ""}
+      template={edit?.template}
+      onSave={(latex) => edit?.save(latex)}
+      onRemove={edit?.initial ? () => edit.save(null) : undefined}
+    />
+  );
+  return { setEdit, dialog };
+}
+
+/**
+ * The question text box. Formulas appear as real maths; click one to change it.
+ * "Formula" opens a visual editor (fractions, roots, powers by buttons or typing
+ * 1/2, x^2, sqrt). People who know LaTeX can switch to the code view.
+ */
 export function MathEditor({
   value,
   onChange,
@@ -45,49 +60,94 @@ export function MathEditor({
   testId?: string;
 }) {
   const { t } = useT();
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const hasMath = /\$/.test(value);
+  const rich = useRef<RichMathHandle>(null);
+  const [code, setCode] = useState(false);
+  const { setEdit, dialog } = useFormulaEditing();
 
-  const insert = (snippet: string) => {
-    const el = ref.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? value.length;
-    const caret = snippet.indexOf("|");
-    const clean = snippet.replace("|", "");
-    const next = value.slice(0, start) + clean + value.slice(end);
-    onChange(next);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      const pos = start + (caret < 0 ? clean.length : caret);
-      el.setSelectionRange(pos, pos);
-    });
-  };
+  const newFormula = (template?: string) =>
+    setEdit({ initial: "", template, save: (latex) => { if (latex) rich.current?.insertFormula(latex); } });
 
   return (
     <div className="space-y-1.5">
-      <div className="flex flex-wrap gap-1" role="toolbar" aria-label={t("math.toolbar")}>
-        {SNIPPETS.map((s) => (
+      <div className="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label={t("math.toolbar")}>
+        <Button type="button" size="sm" variant="secondary" className="gap-1.5" disabled={code} onMouseDown={(e) => e.preventDefault()} onClick={() => newFormula()} data-testid={testId ? `${testId}-formula` : undefined}>
+          <Sigma className="h-4 w-4" /> {t("math.addFormula")}
+        </Button>
+        {QUICK.map((q) => (
           <button
-            key={s.title}
+            key={q.title}
             type="button"
-            title={t(`math.${s.title}`)}
-            onClick={() => insert(s.insert)}
-            className="min-w-8 rounded-md border bg-background px-2 py-1 text-sm font-semibold hover:border-primary hover:text-primary"
+            disabled={code}
+            title={t(`math.${q.title}`)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => newFormula(q.template)}
+            className="min-h-9 min-w-9 rounded-md border bg-card px-2 text-sm font-medium transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
           >
-            {s.label}
+            {q.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setCode((c) => !c)}
+          className="ml-auto min-h-9 rounded-md px-2 text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          data-testid={testId ? `${testId}-code` : undefined}
+        >
+          {code ? t("math.hideCode") : t("math.showCode")}
+        </button>
       </div>
-      <Textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} />
-      {hasMath ? (
-        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-sm">
-          <span className="mr-2 text-sm font-medium text-muted-foreground">{t("math.preview")}</span>
-          <MathText text={value} />
-        </div>
+      {code ? (
+        <>
+          <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} className="font-mono text-sm" />
+          {/\$/.test(value) && (
+            <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+              <span className="mr-2 font-medium text-muted-foreground">{t("math.preview")}</span>
+              <MathText text={value} />
+            </div>
+          )}
+        </>
       ) : (
-        <p className="text-xs text-muted-foreground">{t("math.hint")}</p>
+        <RichMathInput
+          ref={rich}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          testId={testId}
+          onEditFormula={(latex, replace) => setEdit({ initial: latex, save: replace })}
+        />
       )}
+      {dialog}
+    </div>
+  );
+}
+
+/** A one-line answer option that can hold formulas too. */
+export function MathOptionInput({
+  value, onChange, placeholder, testId, className,
+}: { value: string; onChange: (v: string) => void; placeholder?: string; testId?: string; className?: string }) {
+  const { t } = useT();
+  const rich = useRef<RichMathHandle>(null);
+  const { setEdit, dialog } = useFormulaEditing();
+  return (
+    <div className={cn("flex min-w-0 flex-1 items-stretch gap-1.5", className)}>
+      <RichMathInput
+        ref={rich}
+        singleLine
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        testId={testId}
+        className="min-w-0 flex-1 py-1.5"
+        onEditFormula={(latex, replace) => setEdit({ initial: latex, save: replace })}
+      />
+      <Button
+        type="button" variant="outline" size="icon" className="shrink-0"
+        title={t("math.addFormula")} aria-label={t("math.addFormula")}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setEdit({ initial: "", save: (latex) => { if (latex) rich.current?.insertFormula(latex); } })}
+      >
+        <Sigma className="h-4 w-4" />
+      </Button>
+      {dialog}
     </div>
   );
 }

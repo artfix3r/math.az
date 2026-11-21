@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { MathEditor, MathText } from "@/components/math-text";
+import { MathEditor, MathText, MathOptionInput } from "@/components/math-text";
 import { AddFromBank, QuestionMetaRow } from "@/components/question-bank";
+import { ImportQuestionsDialog } from "@/components/import-questions";
+import { compressImage } from "@/lib/extract-text";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
@@ -19,6 +21,7 @@ import {
   ArrowLeft, Plus, Trash2, GripVertical, ListChecks, FileText, ImageIcon,
   Loader2, Check, Save, ToggleLeft, Type, Hash, CheckSquare,
 } from "lucide-react";
+import { ScanText, Camera } from "lucide-react";
 import type { Quiz, Question, Group } from "@shared/schema";
 
 type QType = "mcq" | "open" | "photo" | "true_false" | "fill_blank" | "numeric" | "multi_select";
@@ -85,6 +88,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
   const update = (qid: string, patch: Partial<Question>) =>
     setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, ...patch } : q)));
   const remove = (qid: string) => setQuestions((qs) => qs.filter((q) => q.id !== qid));
+  const [importOpen, setImportOpen] = useState(false);
   const addQ = (type: QType) => setQuestions((qs) => [...qs, blank(type)]);
 
   const toggleMulti = (q: Question, oi: number) => {
@@ -235,7 +239,14 @@ export default function QuizBuilder({ id }: { id?: number }) {
               {q.type === "photo" && (
                 <div className="space-y-1.5">
                   <Label className="text-sm font-bold">{t("qb.imageUrl")}</Label>
-                  <Input value={q.imageUrl} onChange={(e) => update(q.id, { imageUrl: e.target.value })} placeholder="https://…/diagram.png" data-testid={`input-image-${idx}`} />
+                  <div className="flex flex-wrap gap-2">
+                    <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border bg-card px-3 text-sm font-semibold transition-colors hover:border-primary">
+                      <Camera className="h-4 w-4" /> {t("qb.uploadImage")}
+                      <input type="file" accept="image/*" className="sr-only" data-testid={`input-image-file-${idx}`}
+                        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) update(q.id, { imageUrl: await compressImage(f) }); }} />
+                    </label>
+                    <Input value={q.imageUrl.startsWith("data:") ? "" : q.imageUrl} onChange={(e) => update(q.id, { imageUrl: e.target.value })} placeholder={t("qb.imageUrlPlaceholder")} className="min-w-0 flex-1" data-testid={`input-image-${idx}`} />
+                  </div>
                   {q.imageUrl ? (
                     <img src={q.imageUrl} alt="" className="mt-2 max-h-48 rounded-lg border object-contain" />
                   ) : (
@@ -258,15 +269,12 @@ export default function QuizBuilder({ id }: { id?: number }) {
                       >
                         <Check className="h-3.5 w-3.5" />
                       </button>
-                      <Input
+                      <MathOptionInput
                         value={opt}
-                        onChange={(e) => update(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? e.target.value : o)) })}
+                        onChange={(v) => update(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? v : o)) })}
                         placeholder={`${t("common.add")} ${oi + 1}`}
-                        data-testid={`input-option-${idx}-${oi}`}
+                        testId={`input-option-${idx}-${oi}`}
                       />
-                      {opt.includes("$") && (
-                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
-                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndex: 0 })}>
                           <Trash2 className="h-4 w-4" />
@@ -294,15 +302,12 @@ export default function QuizBuilder({ id }: { id?: number }) {
                       >
                         <Check className="h-3.5 w-3.5" />
                       </button>
-                      <Input
+                      <MathOptionInput
                         value={opt}
-                        onChange={(e) => update(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? e.target.value : o)) })}
+                        onChange={(v) => update(q.id, { options: (q.options ?? []).map((o, i) => (i === oi ? v : o)) })}
                         placeholder={`${t("common.add")} ${oi + 1}`}
-                        data-testid={`input-option-${idx}-${oi}`}
+                        testId={`input-option-${idx}-${oi}`}
                       />
-                      {opt.includes("$") && (
-                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
-                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndexes: (q.correctIndexes ?? []).filter((c) => c !== oi).map((c) => (c > oi ? c - 1 : c)) })}>
                           <Trash2 className="h-4 w-4" />
@@ -389,8 +394,17 @@ export default function QuizBuilder({ id }: { id?: number }) {
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("open")} data-testid="button-add-open"><FileText className="h-4 w-4" /> {t("qtype.open")}</Button>
         <Button variant="outline" className="gap-2 font-bold" onClick={() => addQ("photo")} data-testid="button-add-photo"><ImageIcon className="h-4 w-4" /> {t("qtype.photo")}</Button>
         <span className="mx-1 h-6 w-px bg-border" />
+        <Button variant="secondary" className="gap-2" onClick={() => setImportOpen(true)} data-testid="button-import-questions"><ScanText className="h-4 w-4" /> {t("imp.button")}</Button>
         <AddFromBank onAdd={(qs) => setQuestions((cur) => [...cur.filter((q) => q.prompt.trim()), ...qs])} />
       </Card>
+      <ImportQuestionsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onAdd={(qs) => {
+          setQuestions((cur) => [...cur.filter((q) => q.prompt.trim()), ...qs]);
+          toast({ title: t("imp.added", { n: qs.length }) });
+        }}
+      />
     </div>
   );
 }
