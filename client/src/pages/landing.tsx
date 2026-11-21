@@ -4,6 +4,7 @@ import { useAuth, AuthUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Logo } from "@/lib/ui";
 import { MathText } from "@/components/math-text";
+import { LandingSections } from "@/components/landing-sections";
 import { PenScore, PenMark, PenRemark } from "@/components/red-pen";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -47,6 +48,15 @@ export default function Landing() {
   useEffect(() => {
     if (user) navigate("/dashboard");
   }, [user, navigate]);
+
+  // "Start as teacher/student": open sign-up with that role and bring the form into view.
+  const startAs = (r: Role) => {
+    setRole(r);
+    setMode("register");
+    const card = document.getElementById("auth");
+    card?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => (document.querySelector('[data-testid="input-fullname"]') as HTMLInputElement | null)?.focus({ preventScroll: true }), 450);
+  };
 
   const finish = (u: AuthUser) => {
     login(u);
@@ -100,6 +110,17 @@ export default function Landing() {
           <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-muted-foreground">
             {t("landing.pitch2")}
           </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button size="lg" className="gap-2" onClick={() => startAs("teacher")} data-testid="cta-teacher">
+              <GraduationCap className="h-5 w-5" /> {t("lp.cta.teacher")}
+            </Button>
+            <Button size="lg" variant="outline" className="gap-2 bg-card" onClick={() => startAs("student")} data-testid="cta-student">
+              <BookOpen className="h-5 w-5" /> {t("lp.cta.student")}
+            </Button>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            <a href="#how" onClick={(e) => { e.preventDefault(); document.getElementById("how")?.scrollIntoView({ behavior: "smooth" }); }} className="font-medium text-primary underline-offset-4 hover:underline">{t("lp.howLink")}</a>
+          </p>
           <SampleSheet className="mt-8 hidden lg:block" />
           <ul className="mt-8 hidden max-w-lg gap-x-6 gap-y-2.5 text-sm lg:grid lg:grid-cols-2">
             {FACTS.map((k) => (
@@ -109,8 +130,8 @@ export default function Landing() {
         </div>
 
         {/* Right: auth card */}
-        <div className="lg:pt-2">
-          <Card className="mx-auto w-full max-w-md p-5 shadow-lg sm:p-7">
+        <div className="lg:pt-2" id="auth">
+          <Card className="mx-auto w-full max-w-md scroll-mt-6 p-5 shadow-lg sm:p-7">
             <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin" data-testid="tab-signin">{t("landing.signin")}</TabsTrigger>
@@ -191,6 +212,15 @@ export default function Landing() {
           </ul>
         </div>
       </div>
+
+      <LandingSections onStart={startAs} />
+
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm text-muted-foreground lg:px-8">
+          <Logo className="text-base" />
+          <Link href="/feedback" className="font-medium text-primary underline-offset-4 hover:underline">{t("nav.feedback")}</Link>
+        </div>
+      </footer>
 
       <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} />
     </div>
