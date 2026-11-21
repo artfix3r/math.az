@@ -104,8 +104,8 @@ function StudentFirst() {
                   <p className="text-sm text-due">{t("dash.pendingGrade")}</p>
                 ) : (
                   <>
-                    <PenRemark>{t(remarkKey(latest.maxScore ? (latest.score / latest.maxScore) * 100 : 0))}</PenRemark>
-                    <PenScore score={latest.score} max={latest.maxScore} label={t("pen.scoreLabel", { score: latest.score, max: latest.maxScore })} />
+                    <PenRemark animate delay={900}>{t(remarkKey(latest.maxScore ? (latest.score / latest.maxScore) * 100 : 0))}</PenRemark>
+                    <PenScore score={latest.score} max={latest.maxScore} delay={250} label={t("pen.scoreLabel", { score: latest.score, max: latest.maxScore })} />
                   </>
                 )}
               </div>

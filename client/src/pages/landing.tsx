@@ -315,16 +315,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function SampleSheet({ className }: { className?: string }) {
   const { t } = useT();
   const rows = [
-    { q: t("landing.sampleQ1"), f: "$\\frac{x}{3} + 2 = 5$", a: "x = 9", ok: true },
-    { q: t("landing.sampleQ2"), f: "$\\sqrt{49} - 2^{3}$", a: "-2", ok: false, fix: "-1" },
-    { q: t("landing.sampleQ3"), f: "$\\frac{6a^{2}}{2a}$", a: "3a", ok: true },
+    { q: t("landing.sampleQ1"), f: "$\\frac{x}{3} + 2 = 5$", a: "x = 9", ok: true, at: 600 },
+    { q: t("landing.sampleQ2"), f: "$\\sqrt{49} - 2^{3}$", a: "-2", ok: false, fix: "-1", at: 1050 },
+    { q: t("landing.sampleQ3"), f: "$\\frac{6a^{2}}{2a}$", a: "3a", ok: true, at: 1900 },
   ];
   return (
     <figure className={cn("max-w-lg", className)} aria-label={t("landing.sample")}>
       <div className="paper-grid paper-margin overflow-hidden rounded-lg border shadow-md">
         <div className="flex items-start justify-between gap-3 border-b border-[hsl(var(--grid-line))] bg-card/80 py-3 pl-12 pr-4 sm:pl-16">
           <p className="pt-1 text-sm font-semibold">{t("landing.sampleTitle")}</p>
-          <PenScore score={2} max={3} size="sm" label={t("pen.scoreLabel", { score: 2, max: 3 })} />
+          <PenScore score={2} max={3} size="sm" delay={2300} label={t("pen.scoreLabel", { score: 2, max: 3 })} />
         </div>
         <ol className="space-y-0 py-2 pl-12 pr-4 sm:pl-16">
           {rows.map((r, i) => (
@@ -336,10 +336,10 @@ function SampleSheet({ className }: { className?: string }) {
               </span>
               <span className={cn("relative rounded-sm border bg-card px-2.5 py-1 font-medium tabular-nums", r.ok ? "border-border" : "border-pen/40")}>
                 {r.a}
-                {!r.ok && <span aria-hidden="true" className="absolute inset-x-1.5 top-1/2 h-[2px] -rotate-6 bg-pen" />}
+                {!r.ok && <span aria-hidden="true" className="pen-strike absolute inset-x-1.5 top-1/2 h-[2px] bg-pen" style={{ ["--pen-delay" as any]: `${r.at}ms` }} />}
               </span>
-              <PenMark correct={r.ok} label={r.ok ? t("pen.correct") : t("pen.wrong")} />
-              {r.fix && <PenRemark className="-ml-1 w-8">{r.fix}</PenRemark>}
+              <PenMark correct={r.ok} animate delay={r.ok ? r.at : r.at + 300} label={r.ok ? t("pen.correct") : t("pen.wrong")} />
+              {r.fix && <PenRemark animate delay={r.at + 700} className="-ml-1 w-8">{r.fix}</PenRemark>}
               {!r.fix && <span className="-ml-1 w-8" aria-hidden="true" />}
             </li>
           ))}

@@ -122,8 +122,8 @@ export default function TakeQuiz({ id }: { id: number }) {
         <Link href="/quizzes" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> {t("tq.leave")}
         </Link>
-        <span className="flex-1 text-center text-xs text-muted-foreground tabular-nums" aria-live="polite">
-          {t("tq.answered", { n: answeredCount, total: questions.length })}
+        <span className="flex-1 overflow-hidden text-center text-xs text-muted-foreground tabular-nums" aria-live="polite">
+          <span key={answeredCount} className="count-tick inline-block">{t("tq.answered", { n: answeredCount, total: questions.length })}</span>
         </span>
         <div
           role="timer"
@@ -145,7 +145,7 @@ export default function TakeQuiz({ id }: { id: number }) {
           {questions.map((q, idx) => (
             <li key={q.id} className="relative border-b border-[hsl(var(--grid-line))] py-5 pl-12 pr-4 last:border-b-0 sm:pl-16 sm:pr-6" data-testid={`take-question-${idx}`}>
               <span className={cn("absolute left-0 top-5 w-8 text-right text-[15px] font-semibold tabular-nums sm:w-12",
-                isAnswered(q) ? "text-primary" : "text-muted-foreground")} aria-hidden="true">
+                isAnswered(q) ? "text-primary" : "text-muted-foreground", "transition-colors duration-200")} aria-hidden="true">
                 {idx + 1}.
               </span>
               <div className="flex items-start gap-3">
@@ -167,7 +167,7 @@ export default function TakeQuiz({ id }: { id: number }) {
                     return (
                       <button key={oi} type="button" role="radio" aria-checked={selected} onClick={() => setAns(q.id, oi)} data-testid={`answer-${idx}-${oi}`} className={optionCls(selected)}>
                         <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-                          selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground")}>
+                          selected ? "ink-fill border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground")}>
                           {LETTERS[oi] ?? oi + 1}
                         </span>
                         <MathText text={opt} />
@@ -197,7 +197,7 @@ export default function TakeQuiz({ id }: { id: number }) {
                     const selected = selectedSet.includes(String(oi));
                     return (
                       <button key={oi} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleMultiAns(q.id, oi)} data-testid={`answer-${idx}-${oi}`} className={optionCls(selected)}>
-                        <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
+                        <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border", selected ? "ink-fill border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
                           <Check className="h-4 w-4" />
                         </span>
                         <MathText text={opt} />
