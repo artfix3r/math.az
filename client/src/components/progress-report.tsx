@@ -15,9 +15,9 @@ const tooltipStyle = { borderRadius: 12, border: "1px solid hsl(var(--border))",
 function LevelBadge({ level }: { level: TopicProgress["level"] }) {
   const { t } = useT();
   const cfg = {
-    strong: { icon: CheckCircle2, cls: "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-400" },
-    ok: { icon: CircleDot, cls: "border-sky-600/40 bg-sky-600/10 text-sky-700 dark:text-sky-400" },
-    weak: { icon: AlertTriangle, cls: "border-amber-600/40 bg-amber-600/10 text-amber-800 dark:text-amber-400" },
+    strong: { icon: CheckCircle2, cls: "border-correct/40 bg-correct/10 text-correct dark:text-correct" },
+    ok: { icon: CircleDot, cls: "border-primary/40 bg-primary/10 text-primary dark:text-primary" },
+    weak: { icon: AlertTriangle, cls: "border-due/40 bg-due/10 text-due dark:text-due" },
   }[level];
   const Icon = cfg.icon;
   return <Badge variant="outline" className={cn("gap-1 font-bold", cfg.cls)}><Icon className="h-3 w-3" /> {t(`prog.level.${level}`)}</Badge>;
@@ -47,23 +47,23 @@ export function ProgressReportView({ report }: { report: ProgressReport }) {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
-          <p className="text-xs font-bold uppercase text-muted-foreground">{t("prog.average")}</p>
-          <p className="mt-1 text-4xl font-black" data-testid="text-average">{report.averagePercent}%</p>
+          <p className="text-sm font-medium text-muted-foreground">{t("prog.average")}</p>
+          <p className="mt-1 text-4xl font-bold" data-testid="text-average">{report.averagePercent}%</p>
         </Card>
         <Card className="p-5">
-          <p className="text-xs font-bold uppercase text-muted-foreground">{t("prog.quizzesDone")}</p>
-          <p className="mt-1 text-4xl font-black">{report.quizCount}</p>
+          <p className="text-sm font-medium text-muted-foreground">{t("prog.quizzesDone")}</p>
+          <p className="mt-1 text-4xl font-bold">{report.quizCount}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-xs font-bold uppercase text-muted-foreground">{t("prog.needsWork")}</p>
-          <p className="mt-1 truncate text-lg font-black">
+          <p className="text-sm font-medium text-muted-foreground">{t("prog.needsWork")}</p>
+          <p className="mt-1 truncate text-lg font-bold">
             {report.topics.filter((x) => x.level === "weak").map((x) => x.topic || t("prog.noTopic")).join(", ") || t("prog.nothingWeak")}
           </p>
         </Card>
       </div>
 
       <Card className="p-5">
-        <h2 className="font-black">{t("prog.chartTitle")}</h2>
+        <h2 className="font-bold">{t("prog.chartTitle")}</h2>
         {pending > 0 && <p className="text-xs text-muted-foreground">{t("prog.pendingNote", { n: pending })}</p>}
         <div className="mt-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -96,7 +96,7 @@ export function ProgressReportView({ report }: { report: ProgressReport }) {
       </Card>
 
       <Card className="p-5">
-        <h2 className="font-black">{t("prog.topicsTitle")}</h2>
+        <h2 className="font-bold">{t("prog.topicsTitle")}</h2>
         <p className="text-xs text-muted-foreground">{t("prog.topicsHint")}</p>
         <ul className="mt-4 space-y-4">
           {report.topics.map((tp) => (

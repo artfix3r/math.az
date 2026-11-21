@@ -13,10 +13,10 @@ export function MyProgress() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{t("prog.title")}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{t("prog.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("prog.sub")}</p>
       </div>
-      {isLoading || !data ? <Skeleton className="h-96 rounded-2xl" /> : <ProgressReportView report={data} />}
+      {isLoading || !data ? <Skeleton className="h-96 rounded-lg" /> : <ProgressReportView report={data} />}
       <ParentLinkCard />
     </div>
   );
@@ -34,10 +34,10 @@ export function StudentProgress({ id }: { id: number }) {
         <ArrowLeft className="h-4 w-4" /> {t("prog.back")}
       </button>
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{data?.student.fullName ?? "…"}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{data?.student.fullName ?? "…"}</h1>
         <p className="text-sm text-muted-foreground">{t("prog.teacherSub")}</p>
       </div>
-      {isLoading || !data ? <Skeleton className="h-96 rounded-2xl" /> : <ProgressReportView report={data} />}
+      {isLoading || !data ? <Skeleton className="h-96 rounded-lg" /> : <ProgressReportView report={data} />}
       <ParentLinkCard studentId={id} />
     </div>
   );

@@ -71,11 +71,11 @@ export default function GroupDetail({ id }: { id: number }) {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <span className={cn("flex h-14 w-14 items-center justify-center rounded-2xl", c.bg, c.text)}>
+          <span className={cn("flex h-14 w-14 items-center justify-center rounded-lg", c.bg, c.text)}>
             <Users className="h-7 w-7" />
           </span>
           <div>
-            <h1 className="text-3xl font-black tracking-tight">{group?.name ?? t("groups.title")}</h1>
+            <h1 className="text-2xl font-bold sm:text-[28px]">{group?.name ?? t("groups.title")}</h1>
             {group?.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function GroupDetail({ id }: { id: number }) {
 
       {isTeacher && (
         <Card className="p-5">
-          <p className="font-black">{t("gd.addStudent")}</p>
+          <p className="font-bold">{t("gd.addStudent")}</p>
           <p className="mb-3 text-sm text-muted-foreground">{t("gd.addStudentSub")}</p>
           <form
             onSubmit={(e) => { e.preventDefault(); if (identifier) addMember.mutate(); }}
@@ -115,16 +115,16 @@ export default function GroupDetail({ id }: { id: number }) {
       )}
 
       <div>
-        <h2 className="mb-3 text-lg font-black">{t("gd.studentsHeading")} {members && `(${members.length})`}</h2>
+        <h2 className="mb-3 text-lg font-bold">{t("gd.studentsHeading")} {members && `(${members.length})`}</h2>
         {isLoading ? (
-          <Skeleton className="h-40 rounded-2xl" />
+          <Skeleton className="h-40 rounded-lg" />
         ) : members && members.length > 0 ? (
           <div className="grid gap-2">
             {members.map((m) => {
               const mc = colorOf(m.avatarColor);
               return (
                 <Card key={m.id} className="flex items-center gap-3 p-3" data-testid={`member-${m.id}`}>
-                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-full font-extrabold", mc.bg, mc.text)}>
+                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-full font-bold", mc.bg, mc.text)}>
                     {m.fullName[0]?.toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">

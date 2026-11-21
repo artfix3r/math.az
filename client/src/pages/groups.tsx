@@ -47,7 +47,7 @@ export default function Groups() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">{t("groups.title")}</h1>
+          <h1 className="text-2xl font-bold sm:text-[28px]">{t("groups.title")}</h1>
           <p className="text-sm text-muted-foreground">{isTeacher ? t("groups.teacherSub") : t("groups.studentSub")}</p>
         </div>
         {isTeacher && (
@@ -88,7 +88,7 @@ export default function Groups() {
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-36 rounded-lg" />)}
         </div>
       ) : groups && groups.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,12 +98,12 @@ export default function Groups() {
               <Link key={g.id} href={`/groups/${g.id}`}>
                 <Card className="group h-full p-5 hover-elevate" data-testid={`card-group-${g.id}`}>
                   <div className="flex items-start justify-between">
-                    <span className={cn("flex h-11 w-11 items-center justify-center rounded-xl", c.bg, c.text)}>
+                    <span className={cn("flex h-11 w-11 items-center justify-center rounded-lg", c.bg, c.text)}>
                       <Users className="h-5 w-5" />
                     </span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
                   </div>
-                  <h3 className="mt-4 text-lg font-black">{g.name}</h3>
+                  <h3 className="mt-4 text-lg font-bold">{g.name}</h3>
                   {g.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{g.description}</p>}
                   <p className="mt-3 text-xs font-bold text-muted-foreground">{g.memberCount} {g.memberCount === 1 ? t("groups.student") : t("groups.students")}</p>
                 </Card>
@@ -113,7 +113,7 @@ export default function Groups() {
         </div>
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Users className="h-7 w-7" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary"><Users className="h-7 w-7" /></span>
           <p className="mt-4 font-bold">{isTeacher ? t("groups.noneTeacher") : t("groups.noneStudent")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? t("groups.noneTeacherSub") : t("groups.noneStudentSub")}</p>
         </Card>

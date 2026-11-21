@@ -46,14 +46,14 @@ export default function Sessions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">{t("sess.title")}</h1>
+          <h1 className="text-2xl font-bold sm:text-[28px]">{t("sess.title")}</h1>
           <p className="text-sm text-muted-foreground">{isTeacher ? t("sess.teacherSub") : t("sess.studentSub")}</p>
         </div>
         {isTeacher && <NewSessionDialog />}
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-32 rounded-2xl" /></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-32 rounded-lg" /><Skeleton className="h-32 rounded-lg" /></div>
       ) : sorted.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {sorted.map((s) => {
@@ -62,11 +62,11 @@ export default function Sessions() {
               <Card key={s.id} className="flex flex-col p-5" data-testid={`session-${s.id}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300"><Video className="h-5 w-5" /></span>
-                    <h3 className="text-lg font-black">{s.title}</h3>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"><Video className="h-5 w-5" /></span>
+                    <h3 className="text-lg font-bold">{s.title}</h3>
                   </div>
-                  {st === "live" ? <Badge className="animate-pulse bg-green-500 text-white">{t("sess.live")}</Badge>
-                    : st === "upcoming" ? <Badge className="bg-blue-500 text-white">{t("sess.upcoming")}</Badge>
+                  {st === "live" ? <Badge className="animate-pulse bg-correct text-white">{t("sess.live")}</Badge>
+                    : st === "upcoming" ? <Badge className="bg-primary text-primary-foreground">{t("sess.upcoming")}</Badge>
                     : <Badge className="bg-muted text-muted-foreground">{t("sess.ended")}</Badge>}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
@@ -91,7 +91,7 @@ export default function Sessions() {
         </div>
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Video className="h-7 w-7" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary"><Video className="h-7 w-7" /></span>
           <p className="mt-4 font-bold">{t("sess.none")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{isTeacher ? t("sess.noneTeacherSub") : t("sess.noneStudentSub")}</p>
         </Card>

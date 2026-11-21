@@ -3,11 +3,9 @@ import { MathText } from "@/components/math-text";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
@@ -99,149 +97,137 @@ export default function TakeQuiz({ id }: { id: number }) {
       return { ...a, [qid]: { answer: next.join(",") } };
     });
 
-  if (isLoading) return <Skeleton className="h-96 rounded-2xl" />;
+  if (isLoading) return <Skeleton className="h-96 rounded-lg" />;
   if (!quiz) return <p>{t("tq.notFound")}</p>;
 
   const mm = remaining != null ? String(Math.floor(remaining / 60)).padStart(2, "0") : "--";
   const ss = remaining != null ? String(remaining % 60).padStart(2, "0") : "--";
   const lowTime = remaining != null && remaining < 60;
 
+  const isAnswered = (q: Question) => {
+    const v = answers[q.id]?.answer;
+    return v !== undefined && String(v) !== "";
+  };
+  const answeredCount = questions.filter(isAnswered).length;
+  const LETTERS = "ABCDEFGH";
+
+  const optionCls = (selected: boolean) =>
+    cn("flex min-h-12 w-full items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-left text-[15px] transition-colors",
+      selected ? "border-primary ring-1 ring-primary" : "border-input hover:border-primary/50");
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Link href="/quizzes" className="inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground">
+    <div className="-mx-4 sm:mx-0">
+      {/* Timer and progress stay in view while working */}
+      <div className="sticky top-14 z-20 flex items-center gap-3 border-b bg-background/95 px-4 py-2 backdrop-blur-sm sm:rounded-b-md sm:border-x lg:top-16">
+        <Link href="/quizzes" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> {t("tq.leave")}
         </Link>
-        <div className={cn("flex items-center gap-2 rounded-full px-4 py-2 font-black tabular-nums",
-          lowTime ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-primary/15 text-primary")}>
+        <span className="flex-1 text-center text-xs text-muted-foreground tabular-nums" aria-live="polite">
+          {t("tq.answered", { n: answeredCount, total: questions.length })}
+        </span>
+        <div
+          role="timer"
+          aria-label={t("tq.timeLeft")}
+          className={cn("flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-semibold tabular-nums",
+            lowTime ? "border-pen bg-pen text-white motion-safe:animate-pulse" : "border-border bg-card text-foreground")}
+        >
           <Clock className="h-4 w-4" /> {mm}:{ss}
         </div>
       </div>
 
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">{quiz.title}</h1>
-        {quiz.description && <p className="text-sm text-muted-foreground">{quiz.description}</p>}
-      </div>
+      <article className="paper-grid paper-margin mt-4 border-y shadow-sm sm:rounded-lg sm:border">
+        <header className="border-b border-[hsl(var(--grid-line))] py-5 pl-12 pr-4 sm:pl-16 sm:pr-6">
+          <h1 className="text-2xl font-bold sm:text-[28px]">{quiz.title}</h1>
+          {quiz.description && <p className="mt-1 text-sm text-muted-foreground">{quiz.description}</p>}
+        </header>
 
-      <div className="space-y-4">
-        {questions.map((q, idx) => (
-          <Card key={q.id} className="p-5" data-testid={`take-question-${idx}`}>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-bold">Q{idx + 1}</Badge>
-              <Badge className="bg-primary/15 text-primary">{t(`qtype.${q.type}`)}</Badge>
-              <span className="ml-auto text-xs font-bold text-muted-foreground">{q.points} {t("common.points_short")}{q.points > 1 ? "s" : ""}</span>
-            </div>
-            <p className="mt-3 font-bold"><MathText text={q.prompt} /></p>
-
-            {q.type === "photo" && q.imageUrl && (
-              <img src={q.imageUrl} alt="Question diagram" className="mt-3 max-h-72 rounded-xl border object-contain" />
-            )}
-
-            {q.type === "mcq" && (
-              <div className="mt-4 space-y-2">
-                {(q.options ?? []).map((opt, oi) => {
-                  const selected = answers[q.id]?.answer === oi;
-                  return (
-                    <button
-                      key={oi}
-                      type="button"
-                      onClick={() => setAns(q.id, oi)}
-                      data-testid={`answer-${idx}-${oi}`}
-                      className={cn("flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left font-bold transition",
-                        selected ? "border-primary bg-primary/10" : "border-border hover-elevate")}
-                    >
-                      <span className={cn("flex h-6 w-6 items-center justify-center rounded-full border-2", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                      <MathText text={opt} />
-                    </button>
-                  );
-                })}
+        <ol>
+          {questions.map((q, idx) => (
+            <li key={q.id} className="relative border-b border-[hsl(var(--grid-line))] py-5 pl-12 pr-4 last:border-b-0 sm:pl-16 sm:pr-6" data-testid={`take-question-${idx}`}>
+              <span className={cn("absolute left-0 top-5 w-8 text-right text-[15px] font-semibold tabular-nums sm:w-12",
+                isAnswered(q) ? "text-primary" : "text-muted-foreground")} aria-hidden="true">
+                {idx + 1}.
+              </span>
+              <div className="flex items-start gap-3">
+                <p className="min-w-0 flex-1 text-[17px] font-medium leading-relaxed">
+                  <span className="sr-only">{idx + 1}. </span><MathText text={q.prompt} />
+                </p>
+                <span className="shrink-0 pt-1 text-xs text-muted-foreground tabular-nums">{q.points} {t("common.points_short")}</span>
               </div>
-            )}
+              <p className="mt-0.5 text-xs text-muted-foreground">{t(`qtype.${q.type}`)}</p>
 
-            {q.type === "true_false" && (
-              <div className="mt-4 flex gap-2">
-                {[t("qb.true"), t("qb.false")].map((lbl, oi) => {
-                  const selected = answers[q.id]?.answer === oi;
-                  return (
-                    <button
-                      key={oi}
-                      type="button"
-                      onClick={() => setAns(q.id, oi)}
-                      data-testid={`answer-${idx}-${oi}`}
-                      className={cn("flex-1 rounded-xl border-2 px-4 py-3 text-sm font-bold transition",
-                        selected ? "border-primary bg-primary/10" : "border-border hover-elevate")}
-                    >
-                      {lbl}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {q.type === "photo" && q.imageUrl && (
+                <img src={q.imageUrl} alt="" className="mt-3 max-h-72 rounded-md border bg-card object-contain" />
+              )}
 
-            {q.type === "multi_select" && (
-              <div className="mt-4 space-y-2">
-                {(q.options ?? []).map((opt, oi) => {
-                  const selectedSet = String(answers[q.id]?.answer ?? "").split(",").filter((x) => x !== "");
-                  const selected = selectedSet.includes(String(oi));
-                  return (
-                    <button
-                      key={oi}
-                      type="button"
-                      onClick={() => toggleMultiAns(q.id, oi)}
-                      data-testid={`answer-${idx}-${oi}`}
-                      className={cn("flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left font-bold transition",
-                        selected ? "border-primary bg-primary/10" : "border-border hover-elevate")}
-                    >
-                      <span className={cn("flex h-6 w-6 items-center justify-center rounded-md border-2", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                      <MathText text={opt} />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {q.type === "mcq" && (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2" role="radiogroup">
+                  {(q.options ?? []).map((opt, oi) => {
+                    const selected = answers[q.id]?.answer === oi;
+                    return (
+                      <button key={oi} type="button" role="radio" aria-checked={selected} onClick={() => setAns(q.id, oi)} data-testid={`answer-${idx}-${oi}`} className={optionCls(selected)}>
+                        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                          selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground")}>
+                          {LETTERS[oi] ?? oi + 1}
+                        </span>
+                        <MathText text={opt} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {q.type === "fill_blank" && (
-              <Input
-                className="mt-4"
-                placeholder={t("tq.typeAnswer")}
-                value={(answers[q.id]?.answer as string) ?? ""}
-                onChange={(e) => setAns(q.id, e.target.value)}
-                data-testid={`answer-open-${idx}`}
-              />
-            )}
+              {q.type === "true_false" && (
+                <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup">
+                  {[t("qb.true"), t("qb.false")].map((lbl, oi) => {
+                    const selected = answers[q.id]?.answer === oi;
+                    return (
+                      <button key={oi} type="button" role="radio" aria-checked={selected} onClick={() => setAns(q.id, oi)} data-testid={`answer-${idx}-${oi}`} className={cn(optionCls(selected), "justify-center font-medium")}>
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {q.type === "numeric" && (
-              <Input
-                type="number"
-                step="any"
-                className="mt-4"
-                placeholder={t("tq.typeNumber")}
-                value={(answers[q.id]?.answer as string) ?? ""}
-                onChange={(e) => setAns(q.id, e.target.value)}
-                data-testid={`answer-open-${idx}`}
-              />
-            )}
+              {q.type === "multi_select" && (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {(q.options ?? []).map((opt, oi) => {
+                    const selectedSet = String(answers[q.id]?.answer ?? "").split(",").filter((x) => x !== "");
+                    const selected = selectedSet.includes(String(oi));
+                    return (
+                      <button key={oi} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleMultiAns(q.id, oi)} data-testid={`answer-${idx}-${oi}`} className={optionCls(selected)}>
+                        <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border", selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent")}>
+                          <Check className="h-4 w-4" />
+                        </span>
+                        <MathText text={opt} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {(q.type === "open" || q.type === "photo") && (
-              <Textarea
-                className="mt-4"
-                placeholder={t("tq.typeAnswer")}
-                value={(answers[q.id]?.answer as string) ?? ""}
-                onChange={(e) => setAns(q.id, e.target.value)}
-                data-testid={`answer-open-${idx}`}
-              />
-            )}
-          </Card>
-        ))}
-      </div>
+              {q.type === "fill_blank" && (
+                <Input className="mt-4 h-12 max-w-sm text-base" placeholder={t("tq.typeAnswer")} value={(answers[q.id]?.answer as string) ?? ""} onChange={(e) => setAns(q.id, e.target.value)} data-testid={`answer-open-${idx}`} />
+              )}
 
-      <Button onClick={() => submit.mutate(false)} disabled={submit.isPending} className="w-full gap-2 font-bold" size="lg" data-testid="button-submit-quiz">
-        {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("tq.submitQuiz")}
-      </Button>
+              {q.type === "numeric" && (
+                <Input type="number" inputMode="decimal" step="any" className="mt-4 h-12 max-w-[12rem] text-base tabular-nums" placeholder={t("tq.typeNumber")} value={(answers[q.id]?.answer as string) ?? ""} onChange={(e) => setAns(q.id, e.target.value)} data-testid={`answer-open-${idx}`} />
+              )}
+
+              {(q.type === "open" || q.type === "photo") && (
+                <Textarea className="mt-4 min-h-28 text-base" placeholder={t("tq.typeAnswer")} value={(answers[q.id]?.answer as string) ?? ""} onChange={(e) => setAns(q.id, e.target.value)} data-testid={`answer-open-${idx}`} />
+              )}
+            </li>
+          ))}
+        </ol>
+
+        <footer className="border-t border-[hsl(var(--grid-line))] py-5 pl-12 pr-4 sm:pl-16 sm:pr-6">
+          <Button onClick={() => submit.mutate(false)} disabled={submit.isPending} className="w-full gap-2 sm:w-auto" size="lg" data-testid="button-submit-quiz">
+            {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("tq.submitQuiz")}
+          </Button>
+        </footer>
+      </article>
     </div>
   );
 }

@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import { Trophy, Hourglass, CheckCircle2 } from "lucide-react";
-import { useT } from "@/lib/i18n";
+import { Hourglass } from "lucide-react";
+import { useT, formatDateTime } from "@/lib/i18n";
+import { PenScore } from "@/components/red-pen";
 
 type Sub = {
   id: number; quizId: number; quizTitle: string;
@@ -27,71 +26,70 @@ export default function MyResults() {
     percent: s.maxScore ? Math.round((s.score / s.maxScore) * 100) : 0,
   }));
 
+  const pending = (subs ?? []).filter((s) => s.needsGrading).length;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{t("mr.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("mr.sub")}</p>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{t("mr.title")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("mr.sub")}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="flex items-center gap-4 p-5">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"><Trophy className="h-6 w-6" /></span>
-          <div><p className="text-2xl font-black tabular-nums">{avg}%</p><p className="text-sm font-bold text-muted-foreground">{t("mr.avgScore")}</p></div>
-        </Card>
-        <Card className="flex items-center gap-4 p-5">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-600 dark:bg-green-500/15 dark:text-green-300"><CheckCircle2 className="h-6 w-6" /></span>
-          <div><p className="text-2xl font-black tabular-nums">{graded.length}</p><p className="text-sm font-bold text-muted-foreground">{t("mr.quizzesGraded")}</p></div>
-        </Card>
-        <Card className="flex items-center gap-4 p-5">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"><Hourglass className="h-6 w-6" /></span>
-          <div><p className="text-2xl font-black tabular-nums">{(subs ?? []).filter((s) => s.needsGrading).length}</p><p className="text-sm font-bold text-muted-foreground">{t("mr.awaitingGrades")}</p></div>
-        </Card>
-      </div>
+      <dl className="grid grid-cols-3 divide-x rounded-lg border bg-card shadow-sm">
+        {[
+          { k: "mr.avgScore", v: `${avg}%` },
+          { k: "mr.quizzesGraded", v: graded.length },
+          { k: "mr.awaitingGrades", v: pending },
+        ].map((x) => (
+          <div key={x.k} className="px-4 py-3.5">
+            <dt className="text-xs text-muted-foreground">{t(x.k)}</dt>
+            <dd className="mt-1 text-2xl font-semibold tabular-nums">{x.v}</dd>
+          </div>
+        ))}
+      </dl>
 
       {isLoading ? (
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-lg" />
       ) : subs && subs.length > 0 ? (
         <>
+          <ul className="divide-y rounded-lg border bg-card shadow-sm">
+            {sorted.slice().reverse().map((s, i) => (
+              <li key={s.id} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-2.5" data-testid={`result-${s.id}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{s.quizTitle}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(s.submittedAt)}</p>
+                </div>
+                {s.needsGrading ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-due"><Hourglass className="h-4 w-4" /> {t("mr.pending")}</span>
+                ) : (
+                  <PenScore score={s.score} max={s.maxScore} size="sm" animate={i === 0} label={t("pen.scoreLabel", { score: s.score, max: s.maxScore })} />
+                )}
+              </li>
+            ))}
+          </ul>
+
           {chartData.length > 1 && (
-            <Card className="p-5">
-              <h2 className="mb-4 font-black">{t("mr.progress")}</h2>
+            <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-5">
+              <h2 className="mb-4 text-[15px] font-semibold">{t("mr.progress")}</h2>
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} formatter={(v) => [`${v}%`, t("quiz.score")]} />
-                    <Line type="monotone" dataKey="percent" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                  <LineChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))" }} formatter={(v) => [`${v}%`, t("quiz.score")]} />
+                    <Line type="monotone" dataKey="percent" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))", stroke: "hsl(var(--card))", strokeWidth: 2 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </Card>
+            </section>
           )}
-
-          <div className="space-y-2">
-            {sorted.slice().reverse().map((s) => (
-              <Card key={s.id} className="flex items-center gap-3 p-4" data-testid={`result-${s.id}`}>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold">{s.quizTitle}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(s.submittedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                </div>
-                {s.needsGrading ? (
-                  <Badge className="gap-1 bg-amber-500 text-white"><Hourglass className="h-3 w-3" /> {t("mr.pending")}</Badge>
-                ) : (
-                  <p className="font-black tabular-nums">{s.score} / {s.maxScore}</p>
-                )}
-              </Card>
-            ))}
-          </div>
         </>
       ) : (
-        <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-7 w-7" /></span>
-          <p className="mt-4 font-bold">{t("mr.none")}</p>
+        <div className="rounded-lg border border-dashed bg-card/60 p-8 text-center">
+          <p className="font-medium">{t("mr.none")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("mr.noneSub")}</p>
-        </Card>
+        </div>
       )}
     </div>
   );

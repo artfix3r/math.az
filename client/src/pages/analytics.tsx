@@ -26,8 +26,8 @@ type Analytics = {
 };
 
 const BAND_COLOR: Record<string, string> = {
-  high: "hsl(var(--chart-4))",
-  mid: "hsl(var(--chart-3))",
+  high: "hsl(var(--correct))",
+  mid: "hsl(var(--due))",
   low: "hsl(var(--destructive))",
 };
 
@@ -35,7 +35,7 @@ export default function Analytics() {
   const { t } = useT();
   const { data, isLoading } = useQuery<Analytics>({ queryKey: ["/api/analytics"] });
 
-  if (isLoading) return <div className="space-y-4"><Skeleton className="h-24 rounded-2xl" /><Skeleton className="h-72 rounded-2xl" /></div>;
+  if (isLoading) return <div className="space-y-4"><Skeleton className="h-24 rounded-lg" /><Skeleton className="h-72 rounded-lg" /></div>;
 
   const cs = data?.classStats;
   const totalSubs = cs?.totalSubmissions ?? data?.perQuiz.reduce((s, q) => s + q.submissions, 0) ?? 0;
@@ -55,13 +55,13 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{t("an.title")}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{t("an.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("an.sub")}</p>
       </div>
 
       {!hasData ? (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BarChart3 className="h-7 w-7" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-7 w-7" /></span>
           <p className="mt-4 font-bold">{t("an.noData")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("an.noDataSub")}</p>
         </Card>
@@ -74,16 +74,16 @@ export default function Analytics() {
 
           {/* ---------------- Class overview ---------------- */}
           <TabsContent value="class" className="mt-5 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat icon={Users} color="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" value={`${classAvg}%`} label={t("an.classAverage")} />
-              <Stat icon={Users} color="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300" value={activeStudents} label={t("an.activeStudents")} />
-              <Stat icon={FileQuestion} color="bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300" value={totalSubs} label={t("an.totalSubmissions")} />
-              <Stat icon={Hourglass} color="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300" value={pending} label={t("an.awaitingGrading")} />
-            </div>
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border shadow-sm lg:grid-cols-4">
+              <Stat icon={Users} color="" value={`${classAvg}%`} label={t("an.classAverage")} />
+              <Stat icon={Users} color="" value={activeStudents} label={t("an.activeStudents")} />
+              <Stat icon={FileQuestion} color="" value={totalSubs} label={t("an.totalSubmissions")} />
+              <Stat icon={Hourglass} color="text-due" value={pending} label={t("an.awaitingGrading")} />
+            </dl>
 
             {distribution.some((d) => d.count > 0) && (
               <Card className="p-5">
-                <h2 className="mb-4 font-black">{t("an.distribution")}</h2>
+                <h2 className="mb-4 font-bold">{t("an.distribution")}</h2>
                 <div className="grid items-center gap-4 sm:grid-cols-2">
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -99,10 +99,10 @@ export default function Analytics() {
                   </div>
                   <div className="space-y-2">
                     {distribution.map((d) => (
-                      <div key={d.band} className="flex items-center gap-3 rounded-xl border bg-card/70 px-3 py-2.5">
+                      <div key={d.band} className="flex items-center gap-3 rounded-lg border bg-card/70 px-3 py-2.5">
                         <span className="h-3 w-3 rounded-full" style={{ background: BAND_COLOR[d.band] }} />
                         <span className="flex-1 text-sm font-bold">{d.name}</span>
-                        <span className="text-sm font-black tabular-nums">{d.count}</span>
+                        <span className="text-sm font-bold tabular-nums">{d.count}</span>
                       </div>
                     ))}
                   </div>
@@ -112,7 +112,7 @@ export default function Analytics() {
 
             {data!.perQuiz.length > 0 && (
               <Card className="p-5">
-                <h2 className="mb-4 font-black">{t("an.perQuiz")}</h2>
+                <h2 className="mb-4 font-bold">{t("an.perQuiz")}</h2>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data!.perQuiz}>
@@ -120,7 +120,7 @@ export default function Analytics() {
                       <XAxis dataKey="title" tick={{ fontSize: 11 }} className="fill-muted-foreground" interval={0} angle={-12} textAnchor="end" height={50} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                       <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))" }} formatter={(v) => [`${v}%`, t("an.colAvg")]} />
-                      <Bar dataKey="avgPercent" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="avgPercent" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} maxBarSize={48} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -133,7 +133,7 @@ export default function Analytics() {
             {data!.perStudent.length > 0 ? (
               <>
                 <Card className="p-5">
-                  <h2 className="mb-4 font-black">{t("an.perStudent")}</h2>
+                  <h2 className="mb-4 font-bold">{t("an.perStudent")}</h2>
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data!.perStudent}>
@@ -141,9 +141,9 @@ export default function Analytics() {
                         <XAxis dataKey="name" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                         <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                         <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))" }} formatter={(v) => [`${v}%`, t("an.colAvg")]} />
-                        <Bar dataKey="avgPercent" radius={[8, 8, 0, 0]}>
+                        <Bar dataKey="avgPercent" radius={[4, 4, 0, 0]} maxBarSize={48}>
                           {data!.perStudent.map((d, i) => (
-                            <Cell key={i} fill={d.avgPercent >= 70 ? "hsl(var(--chart-4))" : d.avgPercent >= 40 ? "hsl(var(--chart-3))" : "hsl(var(--destructive))"} />
+                            <Cell key={i} fill={d.avgPercent >= 70 ? "hsl(var(--correct))" : d.avgPercent >= 40 ? "hsl(var(--due))" : "hsl(var(--pen))"} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -152,7 +152,7 @@ export default function Analytics() {
                 </Card>
 
                 <Card className="p-5">
-                  <h2 className="mb-4 font-black">{t("an.studentTable")}</h2>
+                  <h2 className="mb-4 font-bold">{t("an.studentTable")}</h2>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -166,7 +166,7 @@ export default function Analytics() {
                         <TableRow key={i} data-testid={`student-row-${i}`}>
                           <TableCell className="font-bold">{s.name}</TableCell>
                           <TableCell className="text-right">
-                            <span className={"font-black tabular-nums " + (s.avgPercent >= 70 ? "text-green-600 dark:text-green-400" : s.avgPercent >= 40 ? "text-amber-600 dark:text-amber-400" : "text-destructive")}>
+                            <span className={"font-bold tabular-nums " + (s.avgPercent >= 70 ? "text-correct dark:text-correct" : s.avgPercent >= 40 ? "text-due dark:text-due" : "text-destructive")}>
                               {s.avgPercent}%
                             </span>
                           </TableCell>
@@ -189,9 +189,9 @@ export default function Analytics() {
 
 function Stat({ icon: Icon, color, value, label }: { icon: React.ElementType; color: string; value: React.ReactNode; label: string }) {
   return (
-    <Card className="flex items-center gap-4 p-5">
-      <span className={"flex h-12 w-12 items-center justify-center rounded-xl " + color}><Icon className="h-6 w-6" /></span>
-      <div><p className="text-2xl font-black tabular-nums">{value}</p><p className="text-sm font-bold text-muted-foreground">{label}</p></div>
-    </Card>
+    <div className="bg-card px-4 py-3.5">
+      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className={"h-3.5 w-3.5 " + color} />{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
+    </div>
   );
 }

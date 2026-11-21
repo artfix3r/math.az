@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
+        lg: ".375rem", /* 6px */
+        md: ".3125rem", /* 5px */
         sm: ".1875rem", /* 3px */
       },
       colors: {
@@ -52,6 +52,9 @@ export default {
           border: "var(--destructive-border)",
         },
         ring: "hsl(var(--ring) / <alpha-value>)",
+        pen: "hsl(var(--pen) / <alpha-value>)",
+        correct: "hsl(var(--correct) / <alpha-value>)",
+        due: "hsl(var(--due) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
@@ -85,6 +88,7 @@ export default {
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
+        hand: ["var(--font-hand)"],
         mono: ["var(--font-mono)"],
       },
       keyframes: {

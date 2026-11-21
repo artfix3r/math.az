@@ -30,12 +30,12 @@ export default function Library() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{t("lib.title")}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{t("lib.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("lib.sub")}</p>
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-40 rounded-2xl" /><Skeleton className="h-40 rounded-2xl" /></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-40 rounded-lg" /><Skeleton className="h-40 rounded-lg" /></div>
       ) : templates && templates.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {templates.map((tpl) => {
@@ -43,8 +43,8 @@ export default function Library() {
             return (
               <Card key={tpl.id} className="flex flex-col p-5" data-testid={`template-${tpl.id}`}>
                 <div className="flex items-start justify-between">
-                  <h3 className="text-lg font-black">{tpl.title}</h3>
-                  <Badge className="bg-violet-500 text-white">{t("lib.saved")}</Badge>
+                  <h3 className="text-lg font-bold">{tpl.title}</h3>
+                  <Badge className="bg-primary text-primary-foreground">{t("lib.saved")}</Badge>
                 </div>
                 {tpl.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{tpl.description}</p>}
                 <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
@@ -63,7 +63,7 @@ export default function Library() {
         </div>
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><LibraryIcon className="h-7 w-7" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary"><LibraryIcon className="h-7 w-7" /></span>
           <p className="mt-4 font-bold">{t("lib.empty")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("lib.emptySub")}</p>
         </Card>

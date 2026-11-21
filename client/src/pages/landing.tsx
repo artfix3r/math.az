@@ -2,9 +2,12 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth, AuthUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Logo, MathBackdrop } from "@/lib/ui";
+import { Logo } from "@/lib/ui";
+import { MathText } from "@/components/math-text";
+import { PenScore, PenMark, PenRemark } from "@/components/red-pen";
+import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { LanguageSwitcher } from "@/pages/shell";
+import { LanguageSwitcher, ThemeToggle } from "@/pages/shell";
 import { GoogleSignInButton } from "@/lib/google-signin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +18,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { GraduationCap, Users, FileQuestion, Video, BarChart3, Loader2 } from "lucide-react";
+import { GraduationCap, BookOpen, Loader2, Check } from "lucide-react";
+
+const FACTS = ["landing.fact.formulas", "landing.fact.variants", "landing.fact.deadlines", "landing.fact.languages"];
 
 type Role = "teacher" | "student";
 
@@ -78,44 +83,34 @@ export default function Landing() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-violet-50 via-background to-pink-50 dark:from-violet-950/30 dark:via-background dark:to-pink-950/20">
-      <MathBackdrop />
-      <div className="absolute right-4 top-4 z-20">
-        <LanguageSwitcher />
-      </div>
-      <div className="relative mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-2 lg:gap-16 lg:px-8">
-        {/* Left: pitch */}
-        <div className="order-2 lg:order-1">
-          <Logo className="text-2xl" />
-          <h1 className="mt-6 text-4xl font-black leading-tight tracking-tight sm:text-5xl">
-            {t("landing.headlinePrefix")}{" "}
-            <span className="bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">
-              {t("landing.fun")}
-            </span>
+    <div className="relative min-h-screen bg-background">
+      <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 lg:px-8">
+        <Logo className="text-lg" />
+        <div className="flex items-center gap-1">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
+      </header>
+      <div className="mx-auto grid max-w-6xl gap-x-16 gap-y-8 px-5 pb-16 pt-4 lg:grid-cols-[1.1fr_1fr] lg:px-8 lg:pt-10">
+        {/* Pitch */}
+        <div className="lg:row-span-2">
+          <h1 className="max-w-xl text-[2.1rem] font-bold leading-[1.1] sm:text-5xl sm:leading-[1.05]">
+            {t("landing.headline")}
           </h1>
-          <p className="mt-4 max-w-md text-base text-muted-foreground">
-            {t("landing.pitch")}
+          <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-muted-foreground">
+            {t("landing.pitch2")}
           </p>
-          <ul className="mt-8 grid max-w-md gap-3 sm:grid-cols-2">
-            {[
-              { icon: Users, k: "landing.feat.groups" },
-              { icon: FileQuestion, k: "landing.feat.quizzes" },
-              { icon: Video, k: "landing.feat.sessions" },
-              { icon: BarChart3, k: "landing.feat.graphs" },
-            ].map((f) => (
-              <li key={f.k} className="flex items-center gap-3 rounded-xl border bg-card/70 px-3 py-2.5 backdrop-blur">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <f.icon className="h-4 w-4" />
-                </span>
-                <span className="text-sm font-bold">{t(f.k)}</span>
-              </li>
+          <SampleSheet className="mt-8 hidden lg:block" />
+          <ul className="mt-8 hidden max-w-lg gap-x-6 gap-y-2.5 text-sm lg:grid lg:grid-cols-2">
+            {FACTS.map((k) => (
+              <li key={k} className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{t(k)}</li>
             ))}
           </ul>
         </div>
 
         {/* Right: auth card */}
-        <div className="order-1 lg:order-2">
-          <Card className="mx-auto w-full max-w-md border-2 p-6 shadow-xl sm:p-8">
+        <div className="lg:pt-2">
+          <Card className="mx-auto w-full max-w-md p-5 shadow-lg sm:p-7">
             <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin" data-testid="tab-signin">{t("landing.signin")}</TabsTrigger>
@@ -135,12 +130,12 @@ export default function Landing() {
                       type="button"
                       onClick={() => setForgotOpen(true)}
                       data-testid="link-forgot-password"
-                      className="text-xs font-bold text-primary hover:underline"
+                      className="text-sm font-medium text-primary underline-offset-4 hover:underline"
                     >
                       {t("landing.forgotPassword")}
                     </button>
                   </div>
-                  <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-signin">
+                  <Button type="submit" className="w-full" disabled={loading} data-testid="button-signin">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.signin")}
                   </Button>
                 </form>
@@ -164,7 +159,7 @@ export default function Landing() {
                     <Input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} data-testid="input-regpassword" required />
                     <p className="text-xs text-muted-foreground">{t("landing.passwordHint")}</p>
                   </Field>
-                  <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-register">
+                  <Button type="submit" className="w-full" disabled={loading} data-testid="button-register">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.createAccount", { role: t(`landing.${role}`) })}
                   </Button>
                 </form>
@@ -180,10 +175,20 @@ export default function Landing() {
             )}
           </Card>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            <Link href="/feedback" data-testid="link-feedback" className="font-bold text-primary hover:underline">
+            <Link href="/feedback" data-testid="link-feedback" className="font-medium text-primary underline-offset-4 hover:underline">
               {t("nav.feedback")}
             </Link>
           </p>
+        </div>
+
+        {/* Phone: the sample sheet after sign-in */}
+        <div className="lg:hidden">
+          <SampleSheet />
+          <ul className="mt-6 grid gap-2.5 text-sm">
+            {FACTS.map((k) => (
+              <li key={k} className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{t(k)}</li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -197,7 +202,7 @@ function OrDivider() {
   return (
     <div className="my-4 flex items-center gap-3">
       <span className="h-px flex-1 bg-border" />
-      <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("landing.or")}</span>
+      <span className="text-xs text-muted-foreground">{t("landing.or")}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );
@@ -243,14 +248,14 @@ function ForgotPasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         </DialogHeader>
         {sent ? (
           <DialogFooter>
-            <Button onClick={() => onOpenChange(false)} className="w-full font-bold" data-testid="button-reset-sent-close">
+            <Button onClick={() => onOpenChange(false)} className="w-full" data-testid="button-reset-sent-close">
               {t("landing.gotIt")}
             </Button>
           </DialogFooter>
         ) : (
           <form onSubmit={submit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-bold">{t("landing.email")}</Label>
+              <Label className="text-sm font-medium">{t("landing.email")}</Label>
               <Input
                 type="email"
                 value={email}
@@ -260,7 +265,7 @@ function ForgotPasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 required
               />
             </div>
-            <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-send-reset">
+            <Button type="submit" className="w-full" disabled={loading} data-testid="button-send-reset">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.sendResetLink")}
             </Button>
           </form>
@@ -274,7 +279,7 @@ function RolePicker({ role, setRole, className }: { role: Role; setRole: (r: Rol
   const { t } = useT();
   return (
     <div className={className}>
-      <Label className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("landing.iAmA")}</Label>
+      <Label className="mb-2 block text-sm font-medium">{t("landing.iAmA")}</Label>
       <div className="grid grid-cols-2 gap-2">
         {(["student", "teacher"] as Role[]).map((r) => (
           <button
@@ -282,12 +287,13 @@ function RolePicker({ role, setRole, className }: { role: Role; setRole: (r: Rol
             type="button"
             onClick={() => setRole(r)}
             data-testid={`role-${r}`}
+            aria-pressed={role === r}
             className={
-              "flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition-colors " +
-              (role === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate")
+              "flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors " +
+              (role === r ? "border-primary bg-secondary text-primary ring-1 ring-primary" : "border-input text-muted-foreground hover:bg-muted")
             }
           >
-            <GraduationCap className="h-4 w-4" /> {t(`landing.${r}`)}
+            {r === "student" ? <BookOpen className="h-4 w-4" /> : <GraduationCap className="h-4 w-4" />} {t(`landing.${r}`)}
           </button>
         ))}
       </div>
@@ -298,9 +304,47 @@ function RolePicker({ role, setRole, className }: { role: Role; setRole: (r: Rol
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm font-bold">{label}</Label>
+      <Label className="text-sm font-medium">{label}</Label>
       {children}
     </div>
   );
 }
 
+
+/** A worksheet specimen: the product's real output, marked in red pen. */
+function SampleSheet({ className }: { className?: string }) {
+  const { t } = useT();
+  const rows = [
+    { q: t("landing.sampleQ1"), f: "$\\frac{x}{3} + 2 = 5$", a: "x = 9", ok: true },
+    { q: t("landing.sampleQ2"), f: "$\\sqrt{49} - 2^{3}$", a: "-2", ok: false, fix: "-1" },
+    { q: t("landing.sampleQ3"), f: "$\\frac{6a^{2}}{2a}$", a: "3a", ok: true },
+  ];
+  return (
+    <figure className={cn("max-w-lg", className)} aria-label={t("landing.sample")}>
+      <div className="paper-grid paper-margin overflow-hidden rounded-lg border shadow-md">
+        <div className="flex items-start justify-between gap-3 border-b border-[hsl(var(--grid-line))] bg-card/80 py-3 pl-12 pr-4 sm:pl-16">
+          <p className="pt-1 text-sm font-semibold">{t("landing.sampleTitle")}</p>
+          <PenScore score={2} max={3} size="sm" label={t("pen.scoreLabel", { score: 2, max: 3 })} />
+        </div>
+        <ol className="space-y-0 py-2 pl-12 pr-4 sm:pl-16">
+          {rows.map((r, i) => (
+            <li key={i} className="flex min-h-[60px] items-center gap-3 text-[15px]">
+              <span className="w-5 shrink-0 tabular-nums text-muted-foreground">{i + 1}.</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-muted-foreground sm:inline">{r.q}</span>{" "}
+                <MathText text={r.f} className="inline-block whitespace-nowrap" />
+              </span>
+              <span className={cn("relative rounded-sm border bg-card px-2.5 py-1 font-medium tabular-nums", r.ok ? "border-border" : "border-pen/40")}>
+                {r.a}
+                {!r.ok && <span aria-hidden="true" className="absolute inset-x-1.5 top-1/2 h-[2px] -rotate-6 bg-pen" />}
+              </span>
+              <PenMark correct={r.ok} label={r.ok ? t("pen.correct") : t("pen.wrong")} />
+              {r.fix && <PenRemark className="-ml-1 w-8">{r.fix}</PenRemark>}
+              {!r.fix && <span className="-ml-1 w-8" aria-hidden="true" />}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </figure>
+  );
+}

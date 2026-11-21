@@ -45,9 +45,9 @@ export function ParentLinkCard({ studentId }: { studentId?: number }) {
   return (
     <Card className="space-y-3 p-5" data-testid="card-parent-link">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Users2 className="h-5 w-5" /></span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Users2 className="h-5 w-5" /></span>
         <div>
-          <h2 className="font-black">{t("parent.title")}</h2>
+          <h2 className="font-bold">{t("parent.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("parent.desc")}</p>
         </div>
       </div>
