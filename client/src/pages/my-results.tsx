@@ -3,7 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import { Hourglass } from "lucide-react";
+import { Hourglass, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { useT, formatDateTime } from "@/lib/i18n";
 import { PenScore } from "@/components/red-pen";
 
@@ -54,7 +55,8 @@ export default function MyResults() {
         <>
           <ul className="divide-y rounded-lg border bg-card shadow-sm">
             {sorted.slice().reverse().map((s, i) => (
-              <li key={s.id} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-2.5" data-testid={`result-${s.id}`}>
+              <li key={s.id}>
+               <Link href={`/results/${s.id}`} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/60" data-testid={`result-${s.id}`}>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{s.quizTitle}</p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(s.submittedAt)}</p>
@@ -64,6 +66,8 @@ export default function MyResults() {
                 ) : (
                   <PenScore score={s.score} max={s.maxScore} size="sm" animate={i === 0} label={t("pen.scoreLabel", { score: s.score, max: s.maxScore })} />
                 )}
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+               </Link>
               </li>
             ))}
           </ul>

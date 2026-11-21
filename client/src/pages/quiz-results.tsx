@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ type Sub = {
   id: number; studentId: number; studentName: string; studentEmail: string;
   answers: string; score: number; maxScore: number; needsGrading: number;
   gradedPoints?: string; autoSubmitted?: number; attemptNumber?: number; questionIds?: string;
+  comments?: string; feedback?: string;
 };
 
 export default function QuizResults({ id }: { id: number }) {
@@ -145,6 +147,11 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
     }
   }
   const [points, setPoints] = useState<Record<string, number>>(seed);
+  const [comments, setComments] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sub.comments || "{}") || {}; } catch { return {}; }
+  });
+  const [feedback, setFeedback] = useState(sub.feedback ?? "");
+  const [open, setOpen] = useState(false);
   const total = questions.reduce((acc, q) => acc + (Number(points[q.id]) || 0), 0);
 
   function setQ(id: string, val: number, max: number) {
@@ -203,8 +210,8 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
   }
 
   const grade = useMutation({
-    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: total, needsGrading: 0, gradedPoints: JSON.stringify(points) }),
-    onSuccess: onGraded,
+    mutationFn: async () => apiRequest("PATCH", `/api/submissions/${sub.id}/grade`, { score: total, needsGrading: 0, gradedPoints: JSON.stringify(points), comments, feedback }),
+    onSuccess: () => { setOpen(false); onGraded(); },
   });
 
   const reopen = useMutation({
@@ -236,7 +243,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
           ) : null}
         </div>
       </div>
-      <Dialog>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5 font-bold" data-testid={`button-grade-${sub.id}`}><Pencil className="h-3.5 w-3.5" /> {t("qr.grade")}</Button>
         </DialogTrigger>
@@ -267,16 +274,42 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
                   ) : (
                     renderAnswer(q, a)
                   )}
-                  <div className="mt-3 flex items-center gap-2 border-t pt-3">
-                    <span className="mr-auto text-sm font-bold">{t("qr.pointsAwarded")}</span>
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => setQ(q.id, awarded - 1, q.points)} disabled={awarded <= 0} data-testid={`button-minus-${sub.id}-${q.id}`}><Minus className="h-4 w-4" /></Button>
-                    <Input type="number" min={0} max={q.points} value={awarded} onChange={(e) => setQ(q.id, Number(e.target.value), q.points)} className="w-16 text-center" data-testid={`input-points-${sub.id}-${q.id}`} />
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => setQ(q.id, awarded + 1, q.points)} disabled={awarded >= q.points} data-testid={`button-plus-${sub.id}-${q.id}`}><Plus className="h-4 w-4" /></Button>
-                    <span className="text-sm text-muted-foreground">/ {q.points}</span>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                    <div className="flex gap-1.5" role="radiogroup" aria-label={t("qr.pointsAwarded")}>
+                      <button type="button" role="radio" aria-checked={awarded >= q.points}
+                        onClick={() => setQ(q.id, q.points, q.points)} data-testid={`button-mark-right-${sub.id}-${q.id}`}
+                        className={"inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm font-semibold transition-colors " + (awarded >= q.points ? "border-correct bg-correct/10 text-correct" : "text-muted-foreground hover:border-correct/60")}>
+                        <PenMark correct className="h-5 w-5" label="" /> {t("pen.correct")}
+                      </button>
+                      <button type="button" role="radio" aria-checked={awarded === 0}
+                        onClick={() => setQ(q.id, 0, q.points)} data-testid={`button-mark-wrong-${sub.id}-${q.id}`}
+                        className={"inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm font-semibold transition-colors " + (awarded === 0 ? "border-pen bg-pen/10 text-pen" : "text-muted-foreground hover:border-pen/60")}>
+                        <PenMark correct={false} className="h-5 w-5" label="" /> {t("pen.wrong")}
+                      </button>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => setQ(q.id, awarded - 1, q.points)} disabled={awarded <= 0} data-testid={`button-minus-${sub.id}-${q.id}`} aria-label="−1"><Minus className="h-4 w-4" /></Button>
+                      <Input type="number" min={0} max={q.points} value={awarded} onChange={(e) => setQ(q.id, Number(e.target.value), q.points)} className="h-9 w-14 text-center" data-testid={`input-points-${sub.id}-${q.id}`} aria-label={t("qr.pointsAwarded")} />
+                      <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => setQ(q.id, awarded + 1, q.points)} disabled={awarded >= q.points} data-testid={`button-plus-${sub.id}-${q.id}`} aria-label="+1"><Plus className="h-4 w-4" /></Button>
+                      <span className="text-sm text-muted-foreground tabular-nums">/ {q.points}</span>
+                    </div>
                   </div>
+                  <Textarea
+                    value={comments[q.id] ?? ""}
+                    onChange={(e) => setComments((c) => ({ ...c, [q.id]: e.target.value }))}
+                    placeholder={t("qr.commentPlaceholder")}
+                    className="mt-2 min-h-[2.75rem] text-sm"
+                    rows={1}
+                    data-testid={`input-comment-${sub.id}-${q.id}`}
+                  />
                 </div>
               );
             })}
+          </div>
+          <div className="space-y-1.5 border-t pt-3">
+            <label htmlFor={`fb-${sub.id}`} className="text-sm font-semibold">{t("qr.feedbackLabel")}</label>
+            <Textarea id={`fb-${sub.id}`} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder={t("qr.feedbackPlaceholder")} data-testid={`input-feedback-${sub.id}`} />
+            <p className="text-xs text-muted-foreground">{t("qr.feedbackHint")}</p>
           </div>
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2" data-testid={`total-grade-${sub.id}`}>
