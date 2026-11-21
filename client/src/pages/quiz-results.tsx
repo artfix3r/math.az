@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MathText } from "@/components/math-text";
+import { PenScore, PenMark } from "@/components/red-pen";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -51,16 +52,16 @@ export default function QuizResults({ id }: { id: number }) {
         <ArrowLeft className="h-4 w-4" /> {t("qr.back")}
       </Link>
       <div>
-        <h1 className="text-3xl font-black tracking-tight">{quiz?.title ?? t("qr.results")}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{quiz?.title ?? t("qr.results")}</h1>
         <p className="text-sm text-muted-foreground">{t("qr.submissionsCount", { count: subs?.length ?? 0, avg })}</p>
       </div>
 
       {isLoading ? (
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-lg" />
       ) : subs && subs.length > 0 ? (
         <>
           <Card className="p-5">
-            <h2 className="mb-4 font-black">{t("qr.scoresByStudent")}</h2>
+            <h2 className="mb-4 font-bold">{t("qr.scoresByStudent")}</h2>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
@@ -71,9 +72,9 @@ export default function QuizResults({ id }: { id: number }) {
                     contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
                     formatter={(v) => [`${v}%`, t("quiz.score")]}
                   />
-                  <Bar dataKey="percent" radius={[8, 8, 0, 0]}>
+                  <Bar dataKey="percent" radius={[4, 4, 0, 0]} maxBarSize={48}>
                     {chartData.map((d, i) => (
-                      <Cell key={i} fill={d.percent >= 70 ? "hsl(var(--chart-4))" : d.percent >= 40 ? "hsl(var(--chart-3))" : "hsl(var(--destructive))"} />
+                      <Cell key={i} fill={d.percent >= 70 ? "hsl(var(--correct))" : d.percent >= 40 ? "hsl(var(--due))" : "hsl(var(--pen))"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -82,7 +83,7 @@ export default function QuizResults({ id }: { id: number }) {
           </Card>
 
           <div className="space-y-2">
-            <h2 className="font-black">{t("qr.submissions")}</h2>
+            <h2 className="font-bold">{t("qr.submissions")}</h2>
             {subs.map((s) => (
               <SubRow key={s.id} sub={s} questions={questions} onGraded={() => {
                 queryClient.invalidateQueries({ queryKey: ["/api/quizzes", id, "submissions"] });
@@ -157,16 +158,16 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
     if (q.type === "mcq") {
       const ok = Number(a) === q.correctIndex;
       return (
-        <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: <MathText text={(q.options ?? [])[Number(a)] ?? "—"} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={(q.options ?? [])[q.correctIndex ?? 0] ?? ""} /></>}
+        <p className={"mt-2 text-sm font-bold " + (ok ? "text-correct dark:text-correct" : "text-pen")}>
+          {t("qr.chose")}: <MathText text={(q.options ?? [])[Number(a)] ?? "—"} /> {ok ? null : <>— {t("qr.correctIs")}: <MathText text={(q.options ?? [])[q.correctIndex ?? 0] ?? ""} /></>}
         </p>
       );
     }
     if (q.type === "true_false") {
       const ok = Number(a) === q.correctIndex;
       return (
-        <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {tfLabel(Number(a))} {ok ? "✓" : `— ${t("qr.correctIs")}: ${tfLabel(q.correctIndex ?? 0)}`}
+        <p className={"mt-2 text-sm font-bold " + (ok ? "text-correct dark:text-correct" : "text-pen")}>
+          {t("qr.chose")}: {tfLabel(Number(a))} {ok ? "" : `— ${t("qr.correctIs")}: ${tfLabel(q.correctIndex ?? 0)}`}
         </p>
       );
     }
@@ -177,24 +178,24 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
       const chosen = selected.map((i) => (q.options ?? [])[i]).filter(Boolean).join(", ") || "—";
       const correctStr = (q.correctIndexes ?? []).map((i) => (q.options ?? [])[i]).filter(Boolean).join(", ");
       return (
-        <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: <MathText text={chosen} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={correctStr} /></>}
+        <p className={"mt-2 text-sm font-bold " + (ok ? "text-correct dark:text-correct" : "text-pen")}>
+          {t("qr.chose")}: <MathText text={chosen} /> {ok ? null : <>— {t("qr.correctIs")}: <MathText text={correctStr} /></>}
         </p>
       );
     }
     if (q.type === "fill_blank") {
       const ok = String(a).trim().toLowerCase() === String(q.correctText ?? "").trim().toLowerCase();
       return (
-        <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {String(a)} {ok ? "✓" : `— ${t("qr.correctIs")}: ${q.correctText}`}
+        <p className={"mt-2 text-sm font-bold " + (ok ? "text-correct dark:text-correct" : "text-pen")}>
+          {t("qr.chose")}: {String(a)} {ok ? "" : `— ${t("qr.correctIs")}: ${q.correctText}`}
         </p>
       );
     }
     if (q.type === "numeric") {
       const ok = q.correctNumber !== undefined && Math.abs(Number(a) - q.correctNumber) <= (q.tolerance ?? 0);
       return (
-        <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {String(a)} {ok ? "✓" : `— ${t("qr.correctIs")}: ${q.correctNumber}${q.tolerance ? ` (±${q.tolerance})` : ""}`}
+        <p className={"mt-2 text-sm font-bold " + (ok ? "text-correct dark:text-correct" : "text-pen")}>
+          {t("qr.chose")}: {String(a)} {ok ? "" : `— ${t("qr.correctIs")}: ${q.correctNumber}${q.tolerance ? ` (±${q.tolerance})` : ""}`}
         </p>
       );
     }
@@ -219,15 +220,19 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
         <p className="truncate text-xs text-muted-foreground">{sub.studentEmail}</p>
       </div>
       <div className="text-right">
-        <p className="font-black tabular-nums">{sub.score} / {sub.maxScore}</p>
+        {sub.needsGrading ? (
+          <p className="font-semibold tabular-nums">{sub.score} / {sub.maxScore}</p>
+        ) : (
+          <PenScore score={sub.score} max={sub.maxScore} size="sm" animate={false} label={t("pen.scoreLabel", { score: sub.score, max: sub.maxScore })} />
+        )}
         <div className="flex flex-wrap items-center justify-end gap-1">
           {sub.needsGrading ? (
-            <Badge className="gap-1 bg-amber-500 text-white"><Hourglass className="h-3 w-3" /> {t("qr.needsGrading")}</Badge>
+            <Badge variant="outline" className="gap-1 rounded-sm border-due/50 text-due"><Hourglass className="h-3 w-3" /> {t("qr.needsGrading")}</Badge>
           ) : (
-            <Badge className="gap-1 bg-green-500 text-white"><CheckCircle2 className="h-3 w-3" /> {t("qr.graded")}</Badge>
+            <Badge variant="outline" className="gap-1 rounded-sm border-correct/40 text-correct"><CheckCircle2 className="h-3 w-3" /> {t("qr.graded")}</Badge>
           )}
           {sub.autoSubmitted ? (
-            <Badge className="gap-1 bg-rose-500 text-white" data-testid={`badge-auto-${sub.id}`}><Bot className="h-3 w-3" /> {t("qr.autoSubmitted")}</Badge>
+            <Badge variant="outline" className="gap-1 rounded-sm border-border text-muted-foreground" data-testid={`badge-auto-${sub.id}`}><Bot className="h-3 w-3" /> {t("qr.autoSubmitted")}</Badge>
           ) : null}
         </div>
       </div>
@@ -245,18 +250,18 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
               const isManual = c === null;
               const awarded = Number(points[q.id]) || 0;
               return (
-                <div key={q.id} className={"rounded-xl border p-3 " + (isManual ? "border-violet-400/60 bg-violet-50/40 dark:bg-violet-950/20" : "")}>
+                <div key={q.id} className={"rounded-lg border p-3 " + (isManual ? "border-primary/40 bg-secondary/40" : "")}>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-xs font-bold text-muted-foreground">Q{idx + 1} · {t(`qtype.${q.type}`)} · {t("qr.maxPoints", { max: q.points })}</p>
-                    {c === true && <Badge className="bg-green-500 text-white">{t("qr.autoCorrect")}</Badge>}
-                    {c === false && <Badge variant="destructive">{t("qr.autoWrong")}</Badge>}
-                    {isManual && <Badge className="bg-violet-500 text-white">{t("qr.manualGrade")}</Badge>}
+                    {c === true && <span className="inline-flex items-center gap-1 text-xs font-medium text-correct"><PenMark correct className="h-5 w-5" label={t("qr.autoCorrect")} />{t("qr.autoCorrect")}</span>}
+                    {c === false && <span className="inline-flex items-center gap-1 text-xs font-medium text-pen"><PenMark correct={false} className="h-5 w-5" label={t("qr.autoWrong")} />{t("qr.autoWrong")}</span>}
+                    {isManual && <Badge variant="outline" className="rounded-sm border-primary/40 text-primary">{t("qr.manualGrade")}</Badge>}
                   </div>
                   <p className="mt-1 font-bold"><MathText text={q.prompt} /></p>
                   {q.type === "photo" && q.imageUrl && <img src={q.imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border object-contain" />}
                   {isManual ? (
                     <div className="mt-2">
-                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("qr.studentSolution")}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t("qr.studentSolution")}</p>
                       {renderAnswer(q, a)}
                     </div>
                   ) : (
@@ -276,7 +281,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2" data-testid={`total-grade-${sub.id}`}>
               <span className="text-sm font-bold">{t("qr.totalScore")}</span>
-              <span className="font-black tabular-nums">{total} / {sub.maxScore}</span>
+              <span className="font-bold tabular-nums">{total} / {sub.maxScore}</span>
             </div>
             <Button onClick={() => grade.mutate()} disabled={grade.isPending} className="font-bold sm:ml-auto" data-testid={`button-save-grade-${sub.id}`}>{t("qr.saveGrade")}</Button>
           </DialogFooter>

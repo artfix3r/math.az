@@ -113,7 +113,7 @@ export default function Materials() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black tracking-tight" data-testid="text-materials-title">{t("mat.title")}</h1>
+          <h1 className="text-2xl font-bold sm:text-[28px]" data-testid="text-materials-title">{t("mat.title")}</h1>
           <p className="text-sm text-muted-foreground">{isTeacher ? t("mat.subTeacher") : t("mat.subStudent")}</p>
         </div>
         {isTeacher && (
@@ -149,9 +149,9 @@ export default function Materials() {
 
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-24 rounded-2xl" />
-          <Skeleton className="h-24 rounded-2xl" />
-          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
         </div>
       ) : children.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -166,7 +166,7 @@ export default function Materials() {
         </div>
       ) : (
         <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <FolderOpen className="h-7 w-7" />
           </span>
           <p className="mt-4 font-bold" data-testid="text-materials-empty">{t("mat.empty")}</p>
@@ -208,7 +208,7 @@ function MaterialCard({
         disabled={m.kind !== "folder"}
         data-testid={m.kind === "folder" ? `open-folder-${m.id}` : undefined}
       >
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.kind === "folder" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary"}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.kind === "folder" ? "bg-due/15 text-due dark:text-due" : "bg-primary/10 text-primary"}`}>
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -225,8 +225,8 @@ function MaterialCard({
         {m.kind === "file" && isTeacher && (
           <Badge
             className={m.visibility === "public"
-              ? "bg-teal-500 text-white"
-              : "bg-violet-500 text-white"}
+              ? "bg-primary text-primary-foreground"
+              : "bg-primary text-primary-foreground"}
             data-testid={`badge-visibility-${m.id}`}
           >
             {m.visibility === "public" ? t("mat.badge.public") : t("mat.badge.private")}
@@ -461,7 +461,7 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
                   type="button"
                   onClick={() => setType(opt)}
                   data-testid={`type-${opt}`}
-                  className={`rounded-xl border-2 px-2 py-2.5 text-xs font-bold transition-colors ${
+                  className={`rounded-lg border-2 px-2 py-2.5 text-xs font-bold transition-colors ${
                     type === opt ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"
                   }`}
                 >
@@ -519,7 +519,7 @@ function AddMaterialDialog({ parentId }: { parentId: number | null }) {
 
           {/* Group picker for private */}
           {visibility === "private" && (
-            <div className="space-y-2 rounded-xl border bg-muted/40 p-3">
+            <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
               <Label className="font-bold">{t("mat.pickGroups")}</Label>
               {groups && groups.length > 0 ? (
                 <div className="space-y-2">
@@ -693,7 +693,7 @@ function EditMaterialDialog({
               </div>
 
               {visibility === "private" && (
-                <div className="space-y-2 rounded-xl border bg-muted/40 p-3">
+                <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
                   <Label className="font-bold">{t("mat.pickGroups")}</Label>
                   {groups && groups.length > 0 ? (
                     <div className="space-y-2">

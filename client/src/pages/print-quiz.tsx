@@ -46,7 +46,7 @@ export default function PrintQuiz({ id }: { id: number }) {
 
       <article className="paper mx-auto max-w-[210mm] bg-white p-[14mm] text-black shadow print:max-w-none print:p-0 print:shadow-none">
         <header className="border-b-2 border-black pb-3">
-          <h1 className="text-2xl font-extrabold">{quiz.title}</h1>
+          <h1 className="text-2xl font-bold">{quiz.title}</h1>
           {quiz.description && <p className="mt-1 text-sm">{quiz.description}</p>}
           <div className="mt-4 grid grid-cols-3 gap-6 text-sm">
             <span>{t("print.name")}: ________________</span>
@@ -62,7 +62,7 @@ export default function PrintQuiz({ id }: { id: number }) {
           {model.items.map((it) => (
             <li key={it.number} className="break-inside-avoid">
               <div className="flex gap-2">
-                <span className="font-extrabold">{it.number}.</span>
+                <span className="font-bold">{it.number}.</span>
                 <div className="flex-1">
                   <MathText text={it.prompt} />
                   <span className="ml-2 text-xs text-neutral-500">({t("print.points", { n: it.points })})</span>
@@ -88,7 +88,7 @@ export default function PrintQuiz({ id }: { id: number }) {
 
         {withKey && (
           <section className="answer-key mt-10 border-t-2 border-dashed border-black pt-4 print:mt-0 print:border-0 print:pt-0">
-            <h2 className="text-xl font-extrabold">{t("print.keyTitle", { title: quiz.title })}</h2>
+            <h2 className="text-xl font-bold">{t("print.keyTitle", { title: quiz.title })}</h2>
             <ol className="mt-3 grid grid-cols-4 gap-x-6 gap-y-1 text-sm">
               {model.answerKey.map((k) => (
                 <li key={k.number}><span className="font-bold">{k.number}.</span> <MathText text={k.answer} /></li>

@@ -29,11 +29,8 @@ import { MyProgress, StudentProgress } from "@/pages/progress";
 import ParentView from "@/pages/parent-view";
 import { Loader2 } from "lucide-react";
 
+// The theme is chosen before first paint in main.tsx (saved choice, else the system setting).
 function ThemeInit() {
-  useEffect(() => {
-    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", dark);
-  }, []);
   return null;
 }
 

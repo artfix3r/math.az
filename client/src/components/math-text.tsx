@@ -82,7 +82,7 @@ export function MathEditor({
       <Textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} />
       {hasMath ? (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-sm">
-          <span className="mr-2 text-xs font-bold uppercase text-muted-foreground">{t("math.preview")}</span>
+          <span className="mr-2 text-sm font-medium text-muted-foreground">{t("math.preview")}</span>
           <MathText text={value} />
         </div>
       ) : (

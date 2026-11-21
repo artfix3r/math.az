@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { Logo, MathBackdrop } from "@/lib/ui";
+import { Logo } from "@/lib/ui";
 import { useT } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/pages/shell";
 import { Button } from "@/components/ui/button";
@@ -56,8 +56,7 @@ export default function Feedback() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-violet-50 via-background to-pink-50 dark:from-violet-950/30 dark:via-background dark:to-pink-950/20">
-      <MathBackdrop />
+    <div className="relative min-h-screen overflow-hidden bg-background">
       <div className="absolute right-4 top-4 z-20">
         <LanguageSwitcher />
       </div>
@@ -74,8 +73,8 @@ export default function Feedback() {
         <Card className="border-2 p-6 shadow-xl sm:p-8">
           {sent ? (
             <div className="flex flex-col items-center py-6 text-center" data-testid="feedback-success">
-              <CheckCircle2 className="mb-3 h-12 w-12 text-green-500" />
-              <h2 className="text-xl font-black">{t("fb.thanks")}</h2>
+              <CheckCircle2 className="mb-3 h-12 w-12 text-correct" />
+              <h2 className="text-xl font-bold">{t("fb.thanks")}</h2>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">{t("fb.thanksBody")}</p>
               <Button className="mt-6 font-bold" onClick={reset} data-testid="button-send-another">
                 {t("fb.sendAnother")}
@@ -84,11 +83,11 @@ export default function Feedback() {
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <MessageSquareHeart className="h-5 w-5" />
                 </span>
                 <div>
-                  <h1 className="text-xl font-black leading-tight">{t("fb.title")}</h1>
+                  <h1 className="text-xl font-bold leading-tight">{t("fb.title")}</h1>
                 </div>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">{t("fb.subtitle")}</p>
@@ -142,7 +141,7 @@ export default function Feedback() {
 
         {/* Contact details (#4) */}
         <Card className="mt-4 border-2 p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("fb.contactTitle")}</p>
+          <p className="text-sm font-medium text-muted-foreground">{t("fb.contactTitle")}</p>
           <div className="mt-3 flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Mail className="h-4 w-4" />

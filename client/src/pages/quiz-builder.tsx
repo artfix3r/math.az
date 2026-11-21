@@ -151,7 +151,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-black tracking-tight">{editing ? t("qb.editQuiz") : t("qb.newQuiz")}</h1>
+        <h1 className="text-2xl font-bold sm:text-[28px]">{editing ? t("qb.editQuiz") : t("qb.newQuiz")}</h1>
         <Button onClick={handleSave} disabled={save.isPending} className="gap-2 font-bold" data-testid="button-save-quiz">
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {editing ? t("qb.saveChanges") : t("qb.createQuiz")}
@@ -197,7 +197,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">{t("qb.maxAttemptsHint")} {t("due.hint")}</p>
-        <div className="grid gap-4 rounded-xl border border-dashed p-4 sm:grid-cols-2">
+        <div className="grid gap-4 rounded-lg border border-dashed p-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="font-bold">{t("variant.pickCount")}</Label>
             <Input type="number" min={0} max={questions.length} value={pickCount} onChange={(e) => setPickCount(Math.max(0, Number(e.target.value) || 0))} className="w-28" data-testid="input-pick-count" />
@@ -237,7 +237,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
                   <Label className="text-sm font-bold">{t("qb.imageUrl")}</Label>
                   <Input value={q.imageUrl} onChange={(e) => update(q.id, { imageUrl: e.target.value })} placeholder="https://…/diagram.png" data-testid={`input-image-${idx}`} />
                   {q.imageUrl ? (
-                    <img src={q.imageUrl} alt="" className="mt-2 max-h-48 rounded-xl border object-contain" />
+                    <img src={q.imageUrl} alt="" className="mt-2 max-h-48 rounded-lg border object-contain" />
                   ) : (
                     <p className="text-xs text-muted-foreground">{t("qb.imageHint")}</p>
                   )}
@@ -253,7 +253,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         type="button"
                         onClick={() => update(q.id, { correctIndex: oi })}
                         data-testid={`option-correct-${idx}-${oi}`}
-                        className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition", q.correctIndex === oi ? "border-green-500 bg-green-500 text-white" : "border-input text-transparent")}
+                        className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition", q.correctIndex === oi ? "border-correct/40 bg-correct text-white" : "border-input text-transparent")}
                         aria-label="Mark correct"
                       >
                         <Check className="h-3.5 w-3.5" />
@@ -289,7 +289,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         type="button"
                         onClick={() => toggleMulti(q, oi)}
                         data-testid={`option-correct-${idx}-${oi}`}
-                        className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition", (q.correctIndexes ?? []).includes(oi) ? "border-green-500 bg-green-500 text-white" : "border-input text-transparent")}
+                        className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition", (q.correctIndexes ?? []).includes(oi) ? "border-correct/40 bg-correct text-white" : "border-input text-transparent")}
                         aria-label="Mark correct"
                       >
                         <Check className="h-3.5 w-3.5" />
@@ -327,7 +327,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         type="button"
                         onClick={() => update(q.id, { correctIndex: oi })}
                         data-testid={`option-correct-${idx}-${oi}`}
-                        className={cn("flex-1 rounded-xl border-2 px-4 py-3 text-sm font-bold transition", q.correctIndex === oi ? "border-green-500 bg-green-500/10 text-green-700 dark:text-green-400" : "border-input text-muted-foreground hover:border-primary/50")}
+                        className={cn("flex-1 rounded-lg border-2 px-4 py-3 text-sm font-bold transition", q.correctIndex === oi ? "border-correct/40 bg-correct/10 text-correct dark:text-correct" : "border-input text-muted-foreground hover:border-primary/50")}
                       >
                         {lbl}
                       </button>

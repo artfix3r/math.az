@@ -15,9 +15,10 @@ export function DueBadge({ dueAt, className }: { dueAt?: number | null; classNam
     <Badge
       variant="outline"
       className={cn(
-        "gap-1 font-bold",
-        state === "soon" && "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-        state === "closed" && "border-destructive bg-destructive/10 text-destructive",
+        "gap-1 rounded-sm font-semibold",
+        state === "open" && "border-border text-muted-foreground",
+        state === "soon" && "border-due/50 bg-due/10 text-due",
+        state === "closed" && "border-pen/50 bg-pen/10 text-pen",
         className,
       )}
       data-testid="badge-due"

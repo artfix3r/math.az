@@ -1,191 +1,244 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlarmClock } from "lucide-react";
-import { formatDue } from "@/components/due-badge";
-import { deadlineState } from "@shared/deadlines";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { colorOf } from "@/lib/ui";
+import { useT, formatDateTime } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
-import { Users, FileQuestion, Video, Trophy, Plus, ArrowRight, CalendarClock } from "lucide-react";
+import { DueBadge } from "@/components/due-badge";
+import { PenScore, PenRemark, remarkKey } from "@/components/red-pen";
+import { nextUp, latestResult, teacherAgenda } from "@shared/dashboard";
+import { Plus, ArrowRight, Video, Clock, ListChecks, ChevronRight } from "lucide-react";
 import type { Group, Quiz, ClassSession } from "@shared/schema";
 
 type GroupWithCount = Group & { memberCount: number };
 type StudentQuiz = Quiz & { submission: { score: number; maxScore: number; needsGrading: number } | null };
+type MySubmission = { id: number; quizId: number; quizTitle?: string; score: number; maxScore: number; needsGrading: number; submittedAt: number };
+type Analytics = { perQuiz: { quizId: number; title: string; submissions: number; needsGrading: number }[] };
+
+function questionCount(q: Quiz): number {
+  try { return (JSON.parse(q.questions || "[]") as unknown[]).length; } catch { return 0; }
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useT();
   const isTeacher = user?.role === "teacher";
 
-  const fmt = (ts?: number | null) => {
-    if (!ts) return t("quiz.anytime");
-    return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
-
-  const { data: groups } = useQuery<GroupWithCount[]>({ queryKey: ["/api/groups"] });
-  const { data: quizzes } = useQuery<(Quiz | StudentQuiz)[]>({ queryKey: ["/api/quizzes"] });
-  const { data: sessions } = useQuery<ClassSession[]>({ queryKey: ["/api/sessions"] });
-
   const greeting = (() => {
     const h = new Date().getHours();
     return h < 12 ? t("dash.morning") : h < 18 ? t("dash.afternoon") : t("dash.evening");
   })();
-
-  // Split sessions into today vs. upcoming for the schedule view
-  const now = Date.now();
-  const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); })();
-  const futureSessions = (sessions ?? [])
-    .filter((s) => !s.startAt || s.startAt >= now - 60 * 60 * 1000)
-    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
-  const todaySessions = futureSessions.filter((s) => s.startAt && s.startAt <= endOfToday);
-  const laterSessions = futureSessions.filter((s) => !s.startAt || s.startAt > endOfToday);
-  const timeOnly = (ts?: number | null) =>
-    ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : t("quiz.anytime");
-
-  // Homework due within a day that the student hasn't handed in yet.
-  const dueSoon = isTeacher ? [] : (quizzes ?? []).filter(
-    (q) => !(q as StudentQuiz).submission && deadlineState(q.dueAt, now) === "soon",
-  );
+  const firstName = (user?.fullName ?? "").split(" ")[0];
 
   return (
     <div className="space-y-8">
-      {dueSoon.length > 0 && (
-        <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4" data-testid="banner-due-soon">
-          <p className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
-            <AlarmClock className="h-4 w-4" /> {t("due.bannerTitle", { n: dueSoon.length })}
-          </p>
-          <ul className="mt-2 space-y-1">
-            {dueSoon.map((q) => (
-              <li key={q.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <Link href={`/quizzes/${q.id}/take`} className="font-bold text-primary underline-offset-2 hover:underline">{q.title}</Link>
-                <span className="text-muted-foreground">{t("due.by", { date: formatDue(q.dueAt!) })}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div className="rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-pink-500/10 p-6 sm:p-8">
-        <p className="text-sm font-bold text-primary">{greeting} 👋</p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight" data-testid="text-greeting">
-          {t("dash.helloRole", { role: isTeacher ? t("landing.teacher") : t("landing.student"), name: user?.fullName ?? "" })}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="text-2xl font-bold sm:text-[28px]" data-testid="text-greeting">
+          {greeting}, {firstName}
         </h1>
-        <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-          {isTeacher ? t("dash.teacherSub") : t("dash.studentSub")}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {isTeacher ? (
-            <>
-              <Link href="/quizzes/new"><Button className="gap-2 font-bold" data-testid="button-new-quiz"><Plus className="h-4 w-4" /> {t("dash.newQuiz")}</Button></Link>
-              <Link href="/groups"><Button variant="outline" className="gap-2 font-bold">{t("dash.manageGroups")}</Button></Link>
-            </>
-          ) : (
-            <>
-              <Link href="/quizzes"><Button className="gap-2 font-bold">{t("dash.takeQuiz")} <ArrowRight className="h-4 w-4" /></Button></Link>
-              <Link href="/sessions"><Button variant="outline" className="gap-2 font-bold">{t("dash.joinSession")}</Button></Link>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
         {isTeacher && (
-          <StatCard icon={Users} label={t("dash.stat.groups")} value={groups?.length} color="violet" href="/groups" />
-        )}
-        <StatCard icon={FileQuestion} label={isTeacher ? t("dash.stat.quizzes") : t("dash.stat.availableQuizzes")} value={quizzes?.length} color="pink" href="/quizzes" />
-        <StatCard icon={Video} label={t("dash.stat.sessions")} value={sessions?.length} color="teal" href="/sessions" />
-        {!isTeacher && (
-          <StatCard icon={Trophy} label={t("dash.stat.myResults")} value={(quizzes as StudentQuiz[] | undefined)?.filter((q) => q.submission).length} color="amber" href="/results" />
-        )}
-      </div>
-
-      {/* Today's schedule + upcoming */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black">{t("dash.todaySchedule")}</h2>
-          <Link href="/sessions" className="text-sm font-bold text-primary hover:underline">{t("dash.viewAll")}</Link>
-        </div>
-        {!sessions ? (
-          <Skeleton className="h-24 w-full rounded-2xl" />
-        ) : futureSessions.length === 0 ? (
-          <EmptyRow text={t("dash.noSchedule")} />
-        ) : (
-          <div className="space-y-5">
-            {/* Today */}
-            <div>
-              <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground" data-testid="label-today">
-                <span className="flex h-2 w-2 rounded-full bg-pink-500" /> {t("dash.today")}
-              </p>
-              {todaySessions.length === 0 ? (
-                <EmptyRow text={t("dash.nothingToday")} />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {todaySessions.map((s) => (
-                    <SessionRow key={s.id} s={s} time={timeOnly(s.startAt)} joinLabel={t("dash.join")} highlight />
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Later / upcoming */}
-            {laterSessions.length > 0 && (
-              <div>
-                <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground" data-testid="label-upcoming">
-                  <span className="flex h-2 w-2 rounded-full bg-violet-500" /> {t("dash.upcoming")}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {laterSessions.slice(0, 4).map((s) => (
-                    <SessionRow key={s.id} s={s} time={fmt(s.startAt)} joinLabel={t("dash.join")} />
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="flex gap-2">
+            <Link href="/groups"><Button variant="outline">{t("dash.manageGroups")}</Button></Link>
+            <Link href="/quizzes/new"><Button className="gap-1.5" data-testid="button-new-quiz"><Plus className="h-4 w-4" /> {t("dash.newQuiz")}</Button></Link>
           </div>
+        )}
+      </header>
+
+      {isTeacher ? <TeacherFirst /> : <StudentFirst />}
+      <Schedule />
+    </div>
+  );
+}
+
+/* ----------------------------- Student ----------------------------- */
+
+function StudentFirst() {
+  const { t } = useT();
+  const { data: quizzes } = useQuery<StudentQuiz[]>({ queryKey: ["/api/quizzes"] });
+  const { data: subs } = useQuery<MySubmission[]>({ queryKey: ["/api/my/submissions"] });
+  const now = Date.now();
+  const next = quizzes ? nextUp(quizzes, now) : null;
+  const latest = subs ? latestResult(subs) : null;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-5">
+      <section aria-labelledby="h-next" className="lg:col-span-3">
+        <h2 id="h-next" className="mb-2 text-sm font-semibold text-muted-foreground">{t("dash.nextUp")}</h2>
+        {!quizzes ? (
+          <Skeleton className="h-44 w-full rounded-lg" />
+        ) : next ? (
+          <article className="rounded-lg border bg-card p-5 shadow-sm sm:p-6" data-testid="card-next-up">
+            <h3 className="text-xl font-semibold leading-snug">{next.title}</h3>
+            {next.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{next.description}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              {next.dueAt ? <DueBadge dueAt={next.dueAt} /> : <span>{t("dash.noDeadline")}</span>}
+              <span className="inline-flex items-center gap-1.5"><ListChecks className="h-4 w-4" />{t("dash.questions", { n: questionCount(next) })}</span>
+              <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" />{t("dash.minutes", { n: next.durationMinutes })}</span>
+            </div>
+            <Link href={`/quizzes/${next.id}/take`}>
+              <Button size="lg" className="mt-5 w-full gap-2 sm:w-auto" data-testid="button-start-next">
+                {t("dash.start")} <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </article>
+        ) : (
+          <div className="rounded-lg border border-dashed bg-card/60 p-6 text-sm text-muted-foreground">
+            {t("dash.noHomework")}{" "}
+            <Link href="/quizzes" className="font-medium text-primary underline-offset-4 hover:underline">{t("nav.quizzes")}</Link>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="h-latest" className="lg:col-span-2">
+        <h2 id="h-latest" className="mb-2 text-sm font-semibold text-muted-foreground">{t("dash.latestResult")}</h2>
+        {!subs ? (
+          <Skeleton className="h-44 w-full rounded-lg" />
+        ) : latest ? (
+          <Link href="/results" className="block">
+            <article className="paper-margin flex h-full min-h-[8.5rem] flex-col rounded-lg border bg-card py-5 pl-14 pr-5 shadow-sm transition-colors hover:border-primary/40 sm:pl-16" data-testid="card-latest-result">
+              <h3 className="font-semibold leading-snug">{latest.quizTitle}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(latest.submittedAt)}</p>
+              <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                {latest.needsGrading ? (
+                  <p className="text-sm text-due">{t("dash.pendingGrade")}</p>
+                ) : (
+                  <>
+                    <PenRemark animate delay={900}>{t(remarkKey(latest.maxScore ? (latest.score / latest.maxScore) * 100 : 0))}</PenRemark>
+                    <PenScore score={latest.score} max={latest.maxScore} delay={250} label={t("pen.scoreLabel", { score: latest.score, max: latest.maxScore })} />
+                  </>
+                )}
+              </div>
+            </article>
+          </Link>
+        ) : (
+          <div className="rounded-lg border border-dashed bg-card/60 p-6 text-sm text-muted-foreground">{t("dash.noResults")}</div>
         )}
       </section>
     </div>
   );
 }
 
-function StatCard({ icon: Icon, label, value, color, href }: { icon: React.ElementType; label: string; value?: number; color: string; href: string }) {
-  const c = colorOf(color);
+/* ----------------------------- Teacher ----------------------------- */
+
+function TeacherFirst() {
+  const { t } = useT();
+  const { data: quizzes } = useQuery<Quiz[]>({ queryKey: ["/api/quizzes"] });
+  const { data: groups } = useQuery<GroupWithCount[]>({ queryKey: ["/api/groups"] });
+  const { data: analytics } = useQuery<Analytics>({ queryKey: ["/api/analytics"] });
+  const agenda = quizzes && groups && analytics
+    ? teacherAgenda({ quizzes, perQuiz: analytics.perQuiz, groups, now: Date.now() })
+    : null;
+
   return (
-    <Link href={href}>
-      <Card className="flex items-center gap-4 p-5 hover-elevate">
-        <span className={cn("flex h-12 w-12 items-center justify-center rounded-xl", c.bg, c.text)}>
-          <Icon className="h-6 w-6" />
-        </span>
-        <div>
-          <p className="text-2xl font-black tabular-nums">{value ?? "—"}</p>
-          <p className="text-sm font-bold text-muted-foreground">{label}</p>
-        </div>
-      </Card>
-    </Link>
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      <Panel title={t("dash.toGrade")} id="h-grade">
+        {!agenda ? <RowsSkeleton /> : agenda.toGrade.length === 0 ? (
+          <Empty>{t("dash.nothingToGrade")}</Empty>
+        ) : agenda.toGrade.slice(0, 6).map((x) => (
+          <Row key={x.id} href={`/quizzes/${x.id}/results`} testId={`row-grade-${x.id}`}>
+            <span className="min-w-0 flex-1 truncate font-medium">{x.title}</span>
+            <span className="shrink-0 rounded-sm bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground tabular-nums">
+              {t("dash.toGradeCount", { n: x.count })}
+            </span>
+          </Row>
+        ))}
+      </Panel>
+
+      <Panel title={t("dash.dueThisWeek")} id="h-due">
+        {!agenda ? <RowsSkeleton /> : agenda.dueThisWeek.length === 0 ? (
+          <Empty>{t("dash.nothingDue")}</Empty>
+        ) : agenda.dueThisWeek.slice(0, 6).map((x) => (
+          <Row key={x.id} href={`/quizzes/${x.id}/results`} testId={`row-due-${x.id}`}>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{x.title}</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {x.groupName}{x.groupName ? ", " : ""}{formatDateTime(x.dueAt)}
+              </span>
+            </span>
+            <span className="shrink-0 text-right text-xs tabular-nums">
+              <span className="block text-muted-foreground">{t("dash.handedIn", { n: x.submitted })}</span>
+              {x.missing > 0 && <span className="block font-semibold text-due">{t("dash.missing", { n: x.missing })}</span>}
+            </span>
+          </Row>
+        ))}
+      </Panel>
+    </div>
   );
 }
 
-function SessionRow({ s, time, joinLabel, highlight }: { s: ClassSession; time: string; joinLabel: string; highlight?: boolean }) {
+function Panel({ title, id, children }: { title: string; id: string; children: React.ReactNode }) {
   return (
-    <Card className={cn("flex items-center gap-3 p-4", highlight && "border-pink-500/40 bg-pink-500/5")} data-testid={`card-session-${s.id}`}>
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300">
-        <Video className="h-5 w-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-bold">{s.title}</p>
-        <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarClock className="h-3 w-3" /> {time}</p>
+    <section aria-labelledby={id} className="rounded-lg border bg-card shadow-sm">
+      <h2 id={id} className="border-b px-4 py-3 text-[15px] font-semibold">{title}</h2>
+      <ul className="divide-y">{children}</ul>
+    </section>
+  );
+}
+
+function Row({ href, testId, children }: { href: string; testId?: string; children: React.ReactNode }) {
+  return (
+    <li>
+      <Link href={href} data-testid={testId} className="flex min-h-14 items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/60">
+        {children}
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
+    </li>
+  );
+}
+
+function RowsSkeleton() {
+  return <li className="space-y-2 p-4"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-5 w-1/2" /></li>;
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <li className="px-4 py-6 text-sm text-muted-foreground">{children}</li>;
+}
+
+/* ----------------------------- Schedule ----------------------------- */
+
+function Schedule() {
+  const { t } = useT();
+  const { data: sessions } = useQuery<ClassSession[]>({ queryKey: ["/api/sessions"] });
+  const now = Date.now();
+  const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); })();
+  const upcoming = (sessions ?? [])
+    .filter((s) => !s.startAt || s.startAt >= now - 60 * 60 * 1000)
+    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity))
+    .slice(0, 5);
+
+  return (
+    <section aria-labelledby="h-schedule">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 id="h-schedule" className="text-sm font-semibold text-muted-foreground">{t("dash.todaySchedule")}</h2>
+        <Link href="/sessions" className="text-sm font-medium text-primary underline-offset-4 hover:underline">{t("dash.viewAll")}</Link>
       </div>
-      <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer">
-        <Button size="sm" className="font-bold">{joinLabel}</Button>
-      </a>
-    </Card>
-  );
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return (
-    <Card className="flex items-center justify-center border-dashed p-8 text-sm text-muted-foreground">{text}</Card>
+      {!sessions ? (
+        <Skeleton className="h-20 w-full rounded-lg" />
+      ) : upcoming.length === 0 ? (
+        <div className="rounded-lg border border-dashed bg-card/60 p-5 text-sm text-muted-foreground">{t("dash.noSchedule")}</div>
+      ) : (
+        <ul className="divide-y rounded-lg border bg-card shadow-sm">
+          {upcoming.map((s) => {
+            const today = !!s.startAt && s.startAt <= endOfToday;
+            return (
+              <li key={s.id} className="flex min-h-14 items-center gap-3 px-4 py-2.5" data-testid={`card-session-${s.id}`}>
+                <Video className={cn("h-[18px] w-[18px] shrink-0", today ? "text-primary" : "text-muted-foreground")} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{s.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {today && <span className="font-semibold text-primary">{t("dash.today")} </span>}
+                    {s.startAt ? formatDateTime(s.startAt) : t("quiz.anytime")}
+                  </p>
+                </div>
+                <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant={today ? "default" : "outline"}>{t("dash.join")}</Button>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
