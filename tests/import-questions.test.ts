@@ -98,3 +98,8 @@ test("OCR repair: squared units", () => {
 test("OCR repair: drops lines of stray marks", () => {
   assert.equal(repairOcr("1. Sual\n:——\n—\nA) 2"), "1. Sual\nA) 2");
 });
+
+test("units with squares stay as they are", () => {
+  assert.equal(mathify("96 sm² və 3 m³"), "96 sm² və 3 m³");
+  assert.equal(mathify("a² + b²"), "$a^{2}$ + $b^{2}$");
+});

@@ -92,7 +92,8 @@ export function mathify(text: string): string {
     .split("\n").map(latinLookalikes).join("\n").replace(/\$/g, "\\$");
   s = s.replace(new RegExp(`√\\s*\\(([^()]{1,20})\\)|√\\s*([${L}\\d]+)`, "g"), (_, a, b) => `$\\sqrt{${(a ?? b).trim()}}$`);
   s = s.replace(new RegExp(`([${L}\\d)])\\s*\\^\\s*\\(?(-?[${L}\\d]{1,4})\\)?`, "g"), (_, base, exp) => `$${base}^{${exp}}$`);
-  s = s.replace(new RegExp(`([${L}\\d)])([²³⁴⁵ⁿ])`, "g"), (_, base, sup) => `$${base}^{${SUP[sup]}}$`);
+  // Only a lone letter or number gets a power; "sm²" and "m³" are units and stay as written.
+  s = s.replace(new RegExp(`(?<![${L}])(?<!\\d )([${L}\\d)])([²³⁴⁵ⁿ])`, "g"), (_, base, sup) => `$${base}^{${SUP[sup]}}$`);
   s = s.replace(/(?<![\d/])(\d{1,4})\s*\/\s*(\d{1,4})(?![\d/])/g, (_, a, b) => `$\\frac{${a}}{${b}}$`);
   return s;
 }
