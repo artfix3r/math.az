@@ -70,3 +70,36 @@ test("Russian text keeps its Cyrillic letters", () => {
 test("maths italic letters from PDFs become normal letters", () => {
   assert.equal(mathify("𝑥 + 1 = 3"), "x + 1 = 3");
 });
+
+test("Cyrillic schwa becomes the Azerbaijani ə", () => {
+  assert.equal(mathify("Әdədi tapın: hәll edin"), "Ədədi tapın: həll edin");
+});
+
+import { repairOcr } from "../shared/import-questions";
+
+test("OCR repair: a question number read as $ or S becomes 5", () => {
+  assert.equal(repairOcr("$. Ədədin yarısı"), "5. Ədədin yarısı");
+  assert.equal(repairOcr("S, Ədədin yarısı"), "5. Ədədin yarısı");
+});
+
+test("OCR repair: percent read as 96 before a suffix", () => {
+  assert.equal(repairOcr("Ədədin 2596-i 60-a bərabərdir"), "Ədədin 25%-i 60-a bərabərdir");
+});
+
+test("OCR repair: degree read as 9 in an angle question", () => {
+  assert.equal(repairOcr("Bucaqlardan biri 489, digəri"), "Bucaqlardan biri 48°, digəri");
+  assert.equal(repairOcr("Kitab 489 səhifədir"), "Kitab 489 səhifədir");
+});
+
+test("OCR repair: squared units", () => {
+  assert.equal(repairOcr("A) 40 sm, 96 sm? B) 32 sm, 64 sm: C) 1 m”"), "A) 40 sm, 96 sm² B) 32 sm, 64 sm² C) 1 m²");
+});
+
+test("OCR repair: drops lines of stray marks", () => {
+  assert.equal(repairOcr("1. Sual\n:——\n—\nA) 2"), "1. Sual\nA) 2");
+});
+
+test("units with squares stay as they are", () => {
+  assert.equal(mathify("96 sm² və 3 m³"), "96 sm² və 3 m³");
+  assert.equal(mathify("a² + b²"), "$a^{2}$ + $b^{2}$");
+});
