@@ -261,6 +261,31 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
               const c = isCorrect(q, a);
               const isManual = c === null;
               const awarded = Number(points[q.id]) || 0;
+              // Red pen is available on every question type, not only open ones.
+              const penBlock = () => (
+                  penOpen[q.id] ? (
+                    <div className="rounded-md border border-pen/30 bg-pen/5 p-2">
+                      <p className="mb-1.5 text-sm font-semibold text-pen">{t("qr.penTitle")}</p>
+                      <HandwritingPad
+                        value={annotations[q.id] ?? ""}
+                        onChange={(png) => setAnnotations((x) => { const n = { ...x }; if (png) n[q.id] = png; else delete n[q.id]; return n; })}
+                        background={answers[q.id]?.drawing}
+                        paper
+                        colors={TEACHER_INKS(t)}
+                        label={t("qr.penTitle")}
+                        testId={`teacher-pad-${sub.id}-${q.id}`}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <DrawingView drawing={answers[q.id]?.drawing} annotation={annotations[q.id]} alt={t("qr.studentDrawing")} />
+                      <Button type="button" variant="outline" size="sm" className="gap-1.5 border-pen/40 text-pen hover:bg-pen/5"
+                        onClick={() => setPenOpen((o) => ({ ...o, [q.id]: true }))} data-testid={`button-pen-${sub.id}-${q.id}`}>
+                        <PenLine className="h-4 w-4" /> {answers[q.id]?.drawing ? t("qr.penOnAnswer") : t("qr.penWrite")}
+                      </Button>
+                    </>
+                  )
+              );
               return (
                 <div key={q.id} className={"rounded-lg border p-3 " + (isManual ? "border-primary/40 bg-secondary/40" : "")}>
                   <div className="flex flex-wrap items-center gap-2">
@@ -275,31 +300,13 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
                     <div className="mt-2 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">{t("qr.studentSolution")}</p>
                       {(String(a ?? "").trim() || !answers[q.id]?.drawing) && renderAnswer(q, a)}
-                      {penOpen[q.id] ? (
-                        <div className="rounded-md border border-pen/30 bg-pen/5 p-2">
-                          <p className="mb-1.5 text-sm font-semibold text-pen">{t("qr.penTitle")}</p>
-                          <HandwritingPad
-                            value={annotations[q.id] ?? ""}
-                            onChange={(png) => setAnnotations((x) => { const n = { ...x }; if (png) n[q.id] = png; else delete n[q.id]; return n; })}
-                            background={answers[q.id]?.drawing}
-                            paper
-                            colors={TEACHER_INKS(t)}
-                            label={t("qr.penTitle")}
-                            testId={`teacher-pad-${sub.id}-${q.id}`}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <DrawingView drawing={answers[q.id]?.drawing} annotation={annotations[q.id]} alt={t("qr.studentDrawing")} />
-                          <Button type="button" variant="outline" size="sm" className="gap-1.5 border-pen/40 text-pen hover:bg-pen/5"
-                            onClick={() => setPenOpen((o) => ({ ...o, [q.id]: true }))} data-testid={`button-pen-${sub.id}-${q.id}`}>
-                            <PenLine className="h-4 w-4" /> {answers[q.id]?.drawing ? t("qr.penOnAnswer") : t("qr.penWrite")}
-                          </Button>
-                        </>
-                      )}
+                      {penBlock()}
                     </div>
                   ) : (
-                    renderAnswer(q, a)
+                    <div className="mt-2 space-y-2">
+                      {renderAnswer(q, a)}
+                      {penBlock()}
+                    </div>
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
                     <div className="flex gap-1.5" role="radiogroup" aria-label={t("qr.pointsAwarded")}>
