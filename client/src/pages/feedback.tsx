@@ -19,7 +19,7 @@ import { Loader2, CheckCircle2, Mail, ArrowLeft, MessageSquareHeart } from "luci
 const CONTACT_EMAIL = "";
 type Category = "suggestion" | "bug" | "other";
 
-export default function Feedback() {
+export default function Feedback({ embedded = false }: { embedded?: boolean }) {
   const { t } = useT();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -57,19 +57,24 @@ export default function Feedback() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <div className="absolute right-4 top-4 z-20">
-        <LanguageSwitcher />
-      </div>
-
-      <div className="relative mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-5 py-12">
-        <Link href="/" data-testid="link-back-home" className="mb-6 inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> {t("fb.back")}
-        </Link>
-
-        <div className="mb-6">
-          <Logo className="text-2xl" />
+    <div className={embedded ? "" : "relative min-h-screen overflow-hidden bg-background"}>
+      {!embedded && (
+        <div className="absolute right-4 top-4 z-20">
+          <LanguageSwitcher />
         </div>
+      )}
+
+      <div className={embedded ? "mx-auto max-w-2xl" : "relative mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-5 py-12"}>
+        {!embedded && (
+          <>
+            <Link href="/" data-testid="link-back-home" className="mb-6 inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> {t("fb.back")}
+            </Link>
+            <div className="mb-6">
+              <Logo className="text-2xl" />
+            </div>
+          </>
+        )}
 
         <Card className="border-2 p-6 shadow-xl sm:p-8">
           {sent ? (

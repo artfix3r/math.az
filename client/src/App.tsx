@@ -54,6 +54,13 @@ function Protected({ children, bare = false }: { children: React.ReactNode; bare
   return bare ? <>{children}</> : <AppShell>{children}</AppShell>;
 }
 
+// Signed-in users keep the app menu on the feedback page; visitors get the standalone page.
+function FeedbackRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user ? <AppShell><Feedback embedded /></AppShell> : <Feedback />;
+}
+
 function AppRouter() {
   return (
     <Switch>
@@ -75,7 +82,7 @@ function AppRouter() {
       <Route path="/students/:id/progress">{(p) => <Protected><StudentProgress id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results/:id">{(p) => <Protected><ResultDetail id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
-      <Route path="/feedback" component={Feedback} />
+      <Route path="/feedback" component={FeedbackRoute} />
       <Route path="/parent/:token">{(p) => <ParentView token={p.token} />}</Route>
       <Route path="/reset-password/:token">{(p) => <ResetPassword token={p.token} />}</Route>
       <Route path="/reset-password">{() => <ResetPassword token="" />}</Route>
