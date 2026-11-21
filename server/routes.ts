@@ -12,6 +12,7 @@ import type { Question, Quiz, User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { buildReview, canRevealAnswers } from "@shared/review";
+import { sanitizeAnswers, isDrawing } from "@shared/answers";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
@@ -458,7 +459,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const attemptNumber = existing ? existing.attemptNumber + 1 : 1;
     const autoSubmitted = req.body.autoSubmitted ? 1 : 0;
 
-    const answers = (req.body.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, { answer: string | number }>;
+    const answers = sanitizeAnswers(req.body.answers);
     // Grade against this student's variant, then store answers in the
     // original option order so results pages read them directly.
     const { questions, variant } = studentVariant(quiz, user.id);
@@ -482,6 +483,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     needsGrading: z.union([z.boolean(), z.number()]).optional(),
     gradedPoints: z.union([z.string(), z.record(z.number())]).optional(),
     comments: z.record(z.string().max(1000)).optional(),
+    annotations: z.record(z.string().refine(isDrawing, "Invalid drawing")).optional(),
     feedback: z.string().max(3000).optional(),
   });
   app.patch("/api/submissions/:id/grade", requireUser, requireTeacher, async (req, res) => {
@@ -496,6 +498,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       needsGrading: body.needsGrading ? 1 : 0,
       gradedPoints: typeof body.gradedPoints === "string" ? body.gradedPoints : JSON.stringify(body.gradedPoints ?? {}),
       comments: JSON.stringify(comments),
+      annotations: JSON.stringify(body.annotations ?? {}),
       feedback: (body.feedback ?? "").trim(),
       gradedAt: Date.now(),
     });

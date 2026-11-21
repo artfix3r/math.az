@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/math-text";
 import { PenScore, PenMark, PenRemark } from "@/components/red-pen";
+import { DrawingView } from "@/components/handwriting-pad";
 import { useT, formatDateTime } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Hourglass } from "lucide-react";
@@ -90,7 +91,12 @@ export default function ResultDetail({ id }: { id: number }) {
                     <div className={cn("min-w-0 flex-1 rounded-md border bg-card px-3 py-2 text-[15px]",
                       q.status === "wrong" ? "border-pen/40" : q.status === "correct" ? "border-correct/40" : "border-input")}>
                       <span className="block text-xs text-muted-foreground">{t("rv.yourAnswer")}</span>
-                      {ans === null ? <span className="text-muted-foreground">{t("qr.noAnswer")}</span> : <span className="whitespace-pre-wrap"><MathText text={ans} /></span>}
+                      {ans === null
+                        ? (!q.drawing && <span className="text-muted-foreground">{t("qr.noAnswer")}</span>)
+                        : <span className="whitespace-pre-wrap"><MathText text={ans} /></span>}
+                      {(q.drawing || q.annotation) && (
+                        <DrawingView drawing={q.drawing} annotation={q.annotation} alt={t("qr.studentDrawing")} className={ans === null ? "mt-1" : "mt-2"} />
+                      )}
                     </div>
                     <div className="pt-2">
                       {q.status === "pending"
