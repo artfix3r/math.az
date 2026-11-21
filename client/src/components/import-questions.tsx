@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { MathEditor, MathOptionInput } from "@/components/math-text";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { extractText, compressImage, type Progress } from "@/lib/extract-text";
-import { splitQuestions, mathify } from "@shared/import-questions";
+import { extractText, compressImage, type Progress, type DocLang } from "@/lib/extract-text";
+import { splitQuestions, mathify, repairOcr } from "@shared/import-questions";
 import { Camera, FileUp, ClipboardPaste, Check, Plus, Trash2, Loader2, ArrowLeft, ImageIcon } from "lucide-react";
 import type { Question } from "@shared/schema";
 
@@ -41,7 +41,8 @@ export function ImportQuestionsDialog({
   onOpenChange: (v: boolean) => void;
   onAdd: (questions: Question[]) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const [docLang, setDocLang] = useState<DocLang>(lang === "ru" ? "rus" : lang === "en" ? "eng" : "aze");
   const [step, setStep] = useState<Step>("pick");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState("");
@@ -78,9 +79,9 @@ export function ImportQuestionsDialog({
     setStep("working");
     setProgress({ stage: "loading", percent: 0 });
     try {
-      const { text, image } = await extractText(file, setProgress);
+      const { text, image, ocr } = await extractText(file, docLang, setProgress);
       if (image) setPhoto({ blob: image, url: URL.createObjectURL(image) });
-      fromText(text, !!image);
+      fromText(ocr ? repairOcr(text) : text, !!image);
     } catch (e: any) {
       setError(e?.message === "unsupported_file" ? t("imp.unsupported") : t("imp.failed"));
       setStep("pick");
@@ -138,9 +139,22 @@ export function ImportQuestionsDialog({
 
         {step === "pick" && (
           <div className="grid gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{t("imp.docLang")}</span>
+              <div className="flex rounded-md border p-0.5" role="radiogroup" aria-label={t("imp.docLang")}>
+                {([["aze", "Azərbaycan"], ["rus", "Русский"], ["eng", "English"]] as const).map(([code, label]) => (
+                  <button key={code} type="button" role="radio" aria-checked={docLang === code} onClick={() => setDocLang(code)}
+                    data-testid={`import-lang-${code}`}
+                    className={cn("min-h-9 rounded-sm px-3 text-sm font-medium", docLang === code ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <SourceButton icon={Camera} title={t("imp.takePhoto")} sub={t("imp.takePhotoSub")} onClick={() => camera.current?.click()} testId="button-import-camera" primary />
             <SourceButton icon={FileUp} title={t("imp.chooseFile")} sub={t("imp.chooseFileSub")} onClick={() => picker.current?.click()} testId="button-import-file" />
             <SourceButton icon={ClipboardPaste} title={t("imp.pasteText")} sub={t("imp.pasteTextSub")} onClick={() => setStep("paste")} testId="button-import-paste" />
+            <p className="text-xs leading-relaxed text-muted-foreground">{t("imp.photoTips")}</p>
             {error && <p className="text-sm text-pen" role="alert">{error}</p>}
           </div>
         )}

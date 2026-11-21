@@ -87,10 +87,33 @@ function latinLookalikes(line: string): string {
 export function mathify(text: string): string {
   // Maths italic letters from PDFs (𝑥, 𝑦) become ordinary letters.
   let s = text.replace(/\uD835[\uDC00-\uDFFF]/g, (c) => c.normalize("NFKC"))
+    // The Cyrillic schwa (ә) looks identical to the Azerbaijani ə.
+    .replace(/ә/g, "ə").replace(/Ә/g, "Ə")
     .split("\n").map(latinLookalikes).join("\n").replace(/\$/g, "\\$");
   s = s.replace(new RegExp(`√\\s*\\(([^()]{1,20})\\)|√\\s*([${L}\\d]+)`, "g"), (_, a, b) => `$\\sqrt{${(a ?? b).trim()}}$`);
   s = s.replace(new RegExp(`([${L}\\d)])\\s*\\^\\s*\\(?(-?[${L}\\d]{1,4})\\)?`, "g"), (_, base, exp) => `$${base}^{${exp}}$`);
   s = s.replace(new RegExp(`([${L}\\d)])([²³⁴⁵ⁿ])`, "g"), (_, base, sup) => `$${base}^{${SUP[sup]}}$`);
   s = s.replace(/(?<![\d/])(\d{1,4})\s*\/\s*(\d{1,4})(?![\d/])/g, (_, a, b) => `$\\frac{${a}}{${b}}$`);
   return s;
+}
+
+/**
+ * Fixes the symbol mistakes the text reader makes most on school worksheets
+ * (it reads letters well but confuses %, °, ² and a "5." at the line start).
+ * Applied only to text that came from a photo or scan.
+ */
+export function repairOcr(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => new RegExp(`[${L}\\d]`).test(line) || line.trim() === "")
+    .map((line) => {
+      let l = line.replace(/^(\s*)[$S§]\s*[.,]\s+/, "$15. ");
+      l = l.replace(/(\d{1,3})96(?=-[A-Za-zƏəIıÖöÜüĞğŞşÇç])/g, "$1%");
+      if (/buca[qğ]|dərəcə|угол|angle/i.test(l)) {
+        l = l.replace(/\b(\d{1,3})9\b/g, (m, a) => (Number(m) > 180 ? `${a}°` : m));
+      }
+      l = l.replace(/\b(sm|dm|mm|km|m|см|дм|мм|км|м)\s?[?:"”’](?=\s|,|$)/g, "$1²");
+      return l;
+    })
+    .join("\n");
 }

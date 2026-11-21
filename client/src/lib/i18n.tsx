@@ -698,6 +698,8 @@ const en: Dict = {
   "math.ln": "Natural logarithm",
   "math.vectorLength": "Length of a vector",
   "math.dotProduct": "Dot product",
+  "imp.docLang": "Language of the page:",
+  "imp.photoTips": "For the best result: photograph one page straight from above in good light, and keep the text sharp and filling the frame.",
 };
 
 const az: Dict = {
@@ -1372,6 +1374,8 @@ const az: Dict = {
   "math.ln": "Natural loqarifm",
   "math.vectorLength": "Vektorun uzunluğu",
   "math.dotProduct": "Skalyar hasil",
+  "imp.docLang": "Səhifənin dili:",
+  "imp.photoTips": "Ən yaxşı nəticə üçün: səhifəni yuxarıdan düz, yaxşı işıqda çəkin; mətn aydın olsun və kadrı doldursun.",
 };
 
 const ru: Dict = {
@@ -2046,6 +2050,8 @@ const ru: Dict = {
   "math.ln": "Натуральный логарифм",
   "math.vectorLength": "Длина вектора",
   "math.dotProduct": "Скалярное произведение",
+  "imp.docLang": "Язык страницы:",
+  "imp.photoTips": "Для лучшего результата: снимайте страницу прямо сверху при хорошем свете, текст должен быть чётким и занимать весь кадр.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };
