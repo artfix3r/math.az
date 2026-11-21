@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MathEditor, MathText } from "@/components/math-text";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -198,7 +199,7 @@ export default function QuizBuilder({ id }: { id?: number }) {
             </div>
 
             <div className="mt-3 space-y-3">
-              <Textarea value={q.prompt} onChange={(e) => update(q.id, { prompt: e.target.value })} placeholder={t("qb.promptPlaceholder")} data-testid={`input-prompt-${idx}`} />
+              <MathEditor value={q.prompt} onChange={(v) => update(q.id, { prompt: v })} placeholder={t("qb.promptPlaceholder")} testId={`input-prompt-${idx}`} />
 
               {q.type === "photo" && (
                 <div className="space-y-1.5">
@@ -232,6 +233,9 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         placeholder={`${t("common.add")} ${oi + 1}`}
                         data-testid={`input-option-${idx}-${oi}`}
                       />
+                      {opt.includes("$") && (
+                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
+                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndex: 0 })}>
                           <Trash2 className="h-4 w-4" />
@@ -265,6 +269,9 @@ export default function QuizBuilder({ id }: { id?: number }) {
                         placeholder={`${t("common.add")} ${oi + 1}`}
                         data-testid={`input-option-${idx}-${oi}`}
                       />
+                      {opt.includes("$") && (
+                        <span className="min-w-24 shrink-0 rounded-md bg-muted/50 px-2 py-1 text-sm"><MathText text={opt} /></span>
+                      )}
                       {(q.options?.length ?? 0) > 2 && (
                         <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => update(q.id, { options: (q.options ?? []).filter((_, i) => i !== oi), correctIndexes: (q.correctIndexes ?? []).filter((c) => c !== oi).map((c) => (c > oi ? c - 1 : c)) })}>
                           <Trash2 className="h-4 w-4" />

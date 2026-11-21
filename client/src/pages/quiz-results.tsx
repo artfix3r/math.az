@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MathText } from "@/components/math-text";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -153,7 +154,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
       const ok = Number(a) === q.correctIndex;
       return (
         <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {(q.options ?? [])[Number(a)] ?? "—"} {ok ? "✓" : `— ${t("qr.correctIs")}: ${(q.options ?? [])[q.correctIndex ?? 0]}`}
+          {t("qr.chose")}: <MathText text={(q.options ?? [])[Number(a)] ?? "—"} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={(q.options ?? [])[q.correctIndex ?? 0] ?? ""} /></>}
         </p>
       );
     }
@@ -173,7 +174,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
       const correctStr = (q.correctIndexes ?? []).map((i) => (q.options ?? [])[i]).filter(Boolean).join(", ");
       return (
         <p className={"mt-2 text-sm font-bold " + (ok ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-          {t("qr.chose")}: {chosen} {ok ? "✓" : `— ${t("qr.correctIs")}: ${correctStr}`}
+          {t("qr.chose")}: <MathText text={chosen} /> {ok ? "✓" : <>— {t("qr.correctIs")}: <MathText text={correctStr} /></>}
         </p>
       );
     }
@@ -247,7 +248,7 @@ function SubRow({ sub, questions, onGraded, onReopened }: { sub: Sub; questions:
                     {c === false && <Badge variant="destructive">{t("qr.autoWrong")}</Badge>}
                     {isManual && <Badge className="bg-violet-500 text-white">{t("qr.manualGrade")}</Badge>}
                   </div>
-                  <p className="mt-1 font-bold">{q.prompt}</p>
+                  <p className="mt-1 font-bold"><MathText text={q.prompt} /></p>
                   {q.type === "photo" && q.imageUrl && <img src={q.imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border object-contain" />}
                   {isManual ? (
                     <div className="mt-2">
