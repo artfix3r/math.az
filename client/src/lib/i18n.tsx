@@ -87,8 +87,6 @@ const en: Dict = {
   "landing.username": "Username",
   "landing.usernamePlaceholder": "username",
   "landing.passwordHint": "At least 8 characters with one special character (e.g. ! @ # $).",
-  "landing.teacherCode": "Teacher sign-up code",
-  "landing.teacherCodeHint": "Ask the site admin for this code. It is only needed the first time you create a teacher account.",
   "landing.createAccount": "Create {role} account",
   "landing.or": "or",
   "landing.continueGoogle": "Continue with Google",
@@ -440,6 +438,61 @@ const en: Dict = {
   "mat.badge.private": "Private",
   "mat.folder": "Folder",
   "mat.uploadFailed": "Could not upload that file.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Something went wrong. Please try again.",
+  "err.network": "Could not reach the server. Check your internet connection and try again.",
+  "err.not_authenticated": "Please sign in to continue.",
+  "err.teachers_only": "Only teachers can do this.",
+  "err.admins_only": "Only site admins can do this.",
+  "err.invalid_credentials": "Wrong email/username or password.",
+  "err.login_failed": "Could not sign in. Please try again.",
+  "err.registration_failed": "Could not create the account. Please try again.",
+  "err.email_taken": "An account with this email already exists.",
+  "err.username_taken": "This username is already taken.",
+  "err.google_email_unverified": "Your Google email address is not verified.",
+  "err.google_failed": "Google sign-in failed. Please try again.",
+  "err.google_not_configured": "Google sign-in is not available right now.",
+  "err.email_not_configured": "Sending email is not available right now.",
+  "err.reset_email_failed": "Could not send the reset email. Please try again.",
+  "err.reset_link_invalid": "This reset link is invalid or has expired.",
+  "err.reset_failed": "Could not reset the password. Please try again.",
+  "err.group_not_yours": "You can only use your own groups.",
+  "err.student_not_found": "No student found with that email or username.",
+  "err.not_a_student": "That account is not a student.",
+  "err.already_in_group": "This student is already in the group.",
+  "err.no_attempts_left": "You have used all attempts for this quiz.",
+  "err.save_failed": "Could not save. Please try again.",
+  "err.invalid_folder": "Choose a valid folder.",
+  "err.not_found": "It was not found, or you don't have access to it.",
+  "err.storage_not_configured": "File uploads are not available right now.",
+  "err.upload_failed": "Could not upload the file. Please try again.",
+  "err.file_open_failed": "Could not open the file. Please try again.",
+  "err.file_too_large": "The file is too large. The limit is {max} MB.",
+  "err.invalid_url": "Enter a valid link starting with http:// or https://.",
+  "err.db_unavailable": "The site is temporarily unavailable. Please try again in a minute.",
+  "err.password_too_short": "The password must be at least 8 characters.",
+  "err.password_needs_special": "The password needs at least one special character (for example ! or #).",
+  "err.invalid_email": "Enter a valid email address.",
+  "err.username_too_short": "The username must be at least 2 characters.",
+  "err.field_required": "Please fill in: {field}.",
+  "err.invalid_field": "Please check: {field}.",
+  "field.email": "Email",
+  "field.username": "Username",
+  "field.password": "Password",
+  "field.fullName": "Full name",
+  "field.identifier": "Email or username",
+  "field.title": "Title",
+  "field.meetingUrl": "Meeting link",
+  "field.name": "Name",
+  "field.prompt": "Question text",
+  "field.message": "Message",
+  "field.questions": "Questions",
+  "field.startAt": "Start time",
+  "field.durationMinutes": "Duration",
+  "field.groupId": "Group",
+  "field.options": "Answer options",
+  "field.unknown": "one of the fields",
 };
 
 const az: Dict = {
@@ -515,8 +568,6 @@ const az: Dict = {
   "landing.username": "İstifadəçi adı",
   "landing.usernamePlaceholder": "istifadəçi_adı",
   "landing.passwordHint": "Ən azı 8 simvol və bir xüsusi simvol (məs. ! @ # $).",
-  "landing.teacherCode": "Müəllim qeydiyyat kodu",
-  "landing.teacherCodeHint": "Bu kodu sayt administratorundan alın. Yalnız müəllim hesabını ilk dəfə yaradanda lazımdır.",
   "landing.createAccount": "{role} hesabı yarat",
   "landing.or": "və ya",
   "landing.continueGoogle": "Google ilə davam et",
@@ -856,6 +907,61 @@ const az: Dict = {
   "mat.badge.private": "Şəxsi",
   "mat.folder": "Qovluq",
   "mat.uploadFailed": "Faylı yükləmək mümkün olmadı.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.",
+  "err.network": "Serverə qoşulmaq mümkün olmadı. İnternet bağlantınızı yoxlayıb yenidən cəhd edin.",
+  "err.not_authenticated": "Davam etmək üçün daxil olun.",
+  "err.teachers_only": "Bunu yalnız müəllimlər edə bilər.",
+  "err.admins_only": "Bunu yalnız sayt administratorları edə bilər.",
+  "err.invalid_credentials": "E-poçt/istifadəçi adı və ya şifrə yanlışdır.",
+  "err.login_failed": "Daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.registration_failed": "Hesab yaratmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.email_taken": "Bu e-poçt ilə artıq hesab var.",
+  "err.username_taken": "Bu istifadəçi adı artıq tutulub.",
+  "err.google_email_unverified": "Google e-poçt ünvanınız təsdiqlənməyib.",
+  "err.google_failed": "Google ilə daxil olmaq alınmadı. Yenidən cəhd edin.",
+  "err.google_not_configured": "Google ilə daxil olmaq hazırda mümkün deyil.",
+  "err.email_not_configured": "E-poçt göndərmək hazırda mümkün deyil.",
+  "err.reset_email_failed": "Bərpa məktubunu göndərmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.reset_link_invalid": "Bu bərpa linki etibarsızdır və ya vaxtı keçib.",
+  "err.reset_failed": "Şifrəni bərpa etmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.group_not_yours": "Yalnız öz qruplarınızdan istifadə edə bilərsiniz.",
+  "err.student_not_found": "Bu e-poçt və ya istifadəçi adı ilə şagird tapılmadı.",
+  "err.not_a_student": "Bu hesab şagird hesabı deyil.",
+  "err.already_in_group": "Bu şagird artıq qrupdadır.",
+  "err.no_attempts_left": "Bu test üçün bütün cəhdlərinizi istifadə etmisiniz.",
+  "err.save_failed": "Yadda saxlamaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.invalid_folder": "Düzgün qovluq seçin.",
+  "err.not_found": "Tapılmadı və ya buna giriş icazəniz yoxdur.",
+  "err.storage_not_configured": "Fayl yükləmək hazırda mümkün deyil.",
+  "err.upload_failed": "Faylı yükləmək mümkün olmadı. Yenidən cəhd edin.",
+  "err.file_open_failed": "Faylı açmaq mümkün olmadı. Yenidən cəhd edin.",
+  "err.file_too_large": "Fayl çox böyükdür. Limit {max} MB-dır.",
+  "err.invalid_url": "http:// və ya https:// ilə başlayan düzgün link daxil edin.",
+  "err.db_unavailable": "Sayt müvəqqəti olaraq əlçatan deyil. Bir dəqiqədən sonra yenidən cəhd edin.",
+  "err.password_too_short": "Şifrə ən azı 8 simvoldan ibarət olmalıdır.",
+  "err.password_needs_special": "Şifrədə ən azı bir xüsusi simvol olmalıdır (məsələn, ! və ya #).",
+  "err.invalid_email": "Düzgün e-poçt ünvanı daxil edin.",
+  "err.username_too_short": "İstifadəçi adı ən azı 2 simvol olmalıdır.",
+  "err.field_required": "Zəhmət olmasa doldurun: {field}.",
+  "err.invalid_field": "Zəhmət olmasa yoxlayın: {field}.",
+  "field.email": "E-poçt",
+  "field.username": "İstifadəçi adı",
+  "field.password": "Şifrə",
+  "field.fullName": "Ad və soyad",
+  "field.identifier": "E-poçt və ya istifadəçi adı",
+  "field.title": "Başlıq",
+  "field.meetingUrl": "Görüş linki",
+  "field.name": "Ad",
+  "field.prompt": "Sualın mətni",
+  "field.message": "Mesaj",
+  "field.questions": "Suallar",
+  "field.startAt": "Başlama vaxtı",
+  "field.durationMinutes": "Müddət",
+  "field.groupId": "Qrup",
+  "field.options": "Cavab variantları",
+  "field.unknown": "sahələrdən biri",
 };
 
 const ru: Dict = {
@@ -931,8 +1037,6 @@ const ru: Dict = {
   "landing.username": "Имя пользователя",
   "landing.usernamePlaceholder": "имя_пользователя",
   "landing.passwordHint": "Минимум 8 символов и один специальный символ (напр. ! @ # $).",
-  "landing.teacherCode": "Код регистрации учителя",
-  "landing.teacherCodeHint": "Получите этот код у администратора сайта. Он нужен только при первом создании аккаунта учителя.",
   "landing.createAccount": "Создать аккаунт ({role})",
   "landing.or": "или",
   "landing.continueGoogle": "Продолжить с Google",
@@ -1272,9 +1376,105 @@ const ru: Dict = {
   "mat.badge.private": "Личное",
   "mat.folder": "Папка",
   "mat.uploadFailed": "Не удалось загрузить файл.",
+
+  // --- Error messages (keys err.<code>, see server/errors.ts) ---
+  "err.generic": "Что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+  "err.network": "Не удалось связаться с сервером. Проверьте подключение к интернету и попробуйте ещё раз.",
+  "err.not_authenticated": "Пожалуйста, войдите, чтобы продолжить.",
+  "err.teachers_only": "Это могут делать только учителя.",
+  "err.admins_only": "Это могут делать только администраторы сайта.",
+  "err.invalid_credentials": "Неверный email/имя пользователя или пароль.",
+  "err.login_failed": "Не удалось войти. Попробуйте ещё раз.",
+  "err.registration_failed": "Не удалось создать аккаунт. Попробуйте ещё раз.",
+  "err.email_taken": "Аккаунт с этим email уже существует.",
+  "err.username_taken": "Это имя пользователя уже занято.",
+  "err.google_email_unverified": "Ваш email в Google не подтверждён.",
+  "err.google_failed": "Не удалось войти через Google. Попробуйте ещё раз.",
+  "err.google_not_configured": "Вход через Google сейчас недоступен.",
+  "err.email_not_configured": "Отправка писем сейчас недоступна.",
+  "err.reset_email_failed": "Не удалось отправить письмо для сброса. Попробуйте ещё раз.",
+  "err.reset_link_invalid": "Ссылка для сброса недействительна или устарела.",
+  "err.reset_failed": "Не удалось сбросить пароль. Попробуйте ещё раз.",
+  "err.group_not_yours": "Можно использовать только свои группы.",
+  "err.student_not_found": "Ученик с таким email или именем пользователя не найден.",
+  "err.not_a_student": "Этот аккаунт не является аккаунтом ученика.",
+  "err.already_in_group": "Этот ученик уже в группе.",
+  "err.no_attempts_left": "Вы использовали все попытки для этого теста.",
+  "err.save_failed": "Не удалось сохранить. Попробуйте ещё раз.",
+  "err.invalid_folder": "Выберите правильную папку.",
+  "err.not_found": "Не найдено, или у вас нет доступа.",
+  "err.storage_not_configured": "Загрузка файлов сейчас недоступна.",
+  "err.upload_failed": "Не удалось загрузить файл. Попробуйте ещё раз.",
+  "err.file_open_failed": "Не удалось открыть файл. Попробуйте ещё раз.",
+  "err.file_too_large": "Файл слишком большой. Ограничение — {max} МБ.",
+  "err.invalid_url": "Введите правильную ссылку, начинающуюся с http:// или https://.",
+  "err.db_unavailable": "Сайт временно недоступен. Попробуйте через минуту.",
+  "err.password_too_short": "Пароль должен содержать не менее 8 символов.",
+  "err.password_needs_special": "В пароле должен быть хотя бы один специальный символ (например, ! или #).",
+  "err.invalid_email": "Введите правильный адрес email.",
+  "err.username_too_short": "Имя пользователя должно содержать не менее 2 символов.",
+  "err.field_required": "Пожалуйста, заполните: {field}.",
+  "err.invalid_field": "Пожалуйста, проверьте: {field}.",
+  "field.email": "Email",
+  "field.username": "Имя пользователя",
+  "field.password": "Пароль",
+  "field.fullName": "Имя и фамилия",
+  "field.identifier": "Email или имя пользователя",
+  "field.title": "Название",
+  "field.meetingUrl": "Ссылка на встречу",
+  "field.name": "Название",
+  "field.prompt": "Текст вопроса",
+  "field.message": "Сообщение",
+  "field.questions": "Вопросы",
+  "field.startAt": "Время начала",
+  "field.durationMinutes": "Длительность",
+  "field.groupId": "Группа",
+  "field.options": "Варианты ответа",
+  "field.unknown": "одно из полей",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };
+
+function fill(str: string, vars?: Record<string, string | number>) {
+  if (!vars) return str;
+  for (const [k, v] of Object.entries(vars)) str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+  return str;
+}
+
+export function hasTranslation(lang: Lang, key: string): boolean {
+  return typeof DICTS[lang][key] === "string";
+}
+
+/** An error from the API: `code` (+ `params`) from the server, see server/errors.ts. */
+export type ApiErrorInfo = { code?: string; params?: Record<string, string>; message?: string };
+
+/** The text to show the user for an API error, in the given language. */
+export function translateError(err: ApiErrorInfo, lang: Lang): string {
+  const dict = DICTS[lang];
+  const code = err.code && dict[`err.${err.code}`] ? err.code : "generic";
+  const params: Record<string, string> = { ...(err.params ?? {}) };
+  if ("field" in params) params.field = dict[`field.${params.field}`] ?? dict["field.unknown"];
+  if (code === "file_too_large" && !params.max) params.max = "?";
+  return fill(dict[`err.${code}`], params);
+}
+
+const LANG_KEY = "mathaz.lang";
+const isLang = (v: unknown): v is Lang => v === "en" || v === "az" || v === "ru";
+
+/** The language saved in the browser, or Azerbaijani. */
+export function readSavedLang(store: { getItem(k: string): string | null } | undefined): Lang {
+  try {
+    const v = store?.getItem(LANG_KEY);
+    return isLang(v) ? v : "az";
+  } catch {
+    return "az";
+  }
+}
+
+// The current language, readable outside React (used to translate API errors
+// in lib/queryClient.ts).
+let currentLang: Lang = readSavedLang(typeof window !== "undefined" ? window.localStorage : undefined);
+export const getCurrentLang = () => currentLang;
 
 type I18nCtx = {
   lang: Lang;
@@ -1289,17 +1489,22 @@ const Ctx = createContext<I18nCtx>({
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>("az");
+  const [lang, setLangState] = useState<Lang>(currentLang);
 
-  const t = (key: string, vars?: Record<string, string | number>) => {
-    let str = DICTS[lang][key] ?? DICTS.en[key] ?? key;
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) {
-        str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
-      }
+  // Remember the choice so the site (and its error messages) stay in this
+  // language after a refresh.
+  const setLang = (l: Lang) => {
+    currentLang = l;
+    setLangState(l);
+    try {
+      window.localStorage.setItem(LANG_KEY, l);
+    } catch {
+      // Storage can be blocked; the choice then lasts until the page reloads.
     }
-    return str;
   };
+
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    fill(DICTS[lang][key] ?? DICTS.en[key] ?? key, vars);
 
   return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
 }

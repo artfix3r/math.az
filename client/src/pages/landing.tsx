@@ -36,7 +36,6 @@ export default function Landing() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [teacherCode, setTeacherCode] = useState("");
   // forgot password
   const [forgotOpen, setForgotOpen] = useState(false);
 
@@ -68,7 +67,6 @@ export default function Landing() {
     try {
       const res = await apiRequest("POST", "/api/auth/register", {
         fullName, email, username, password: regPassword, role,
-        ...(role === "teacher" ? { teacherCode } : {}),
       });
       finish(await res.json());
       toast({ title: t("landing.welcome"), description: t("landing.accountCreated", { role: t(`landing.${role}`) }) });
@@ -166,18 +164,12 @@ export default function Landing() {
                     <Input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} data-testid="input-regpassword" required />
                     <p className="text-xs text-muted-foreground">{t("landing.passwordHint")}</p>
                   </Field>
-                  {role === "teacher" && (
-                    <Field label={t("landing.teacherCode")}>
-                      <Input value={teacherCode} onChange={(e) => setTeacherCode(e.target.value)} data-testid="input-teachercode" autoComplete="off" required />
-                      <p className="text-xs text-muted-foreground">{t("landing.teacherCodeHint")}</p>
-                    </Field>
-                  )}
                   <Button type="submit" className="w-full font-bold" disabled={loading} data-testid="button-register">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t("landing.createAccount", { role: t(`landing.${role}`) })}
                   </Button>
                 </form>
                 <OrDivider />
-                <GoogleSignInButton role={role} teacherCode={teacherCode} onSuccess={finish} />
+                <GoogleSignInButton role={role} onSuccess={finish} />
               </TabsContent>
             </Tabs>
 

@@ -77,7 +77,7 @@ app.use("/api", async (_req, res, next) => {
     next();
   } catch (e) {
     console.error("Database not ready:", e);
-    res.status(503).json({ message: "The database is not reachable right now. Please try again in a minute." });
+    res.status(503).json({ message: "The database is not reachable right now. Please try again in a minute.", code: "db_unavailable" });
   }
 });
 
@@ -94,7 +94,7 @@ export const ready = (async () => {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    return res.status(status).json({ message, code: "generic" });
   });
 
   // importantly only setup vite in development and after

@@ -1,5 +1,5 @@
 import { StorageClient } from "@supabase/storage-js";
-import { apiRequest } from "./queryClient";
+import { apiRequest, ApiError } from "./queryClient";
 
 // Uploading learning materials.
 //
@@ -35,11 +35,14 @@ export async function maxUploadBytes(): Promise<number> {
   return cfg.enabled ? cfg.maxBytes : LEGACY_MAX_BYTES;
 }
 
+const tooLarge = (maxBytes: number) =>
+  new ApiError(413, "file_too_large", { max: String(Math.round(maxBytes / 1024 / 1024)) });
+
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file"));
+    reader.onerror = () => reject(new ApiError(0, "upload_failed"));
     reader.readAsDataURL(file);
   });
 }
@@ -54,10 +57,10 @@ export async function uploadMaterialFile(
   const cfg = await getStorageConfig();
   const mimeType = file.type || "application/octet-stream";
   if (!cfg.enabled) {
-    if (file.size > LEGACY_MAX_BYTES) throw new Error("File is too large");
+    if (file.size > LEGACY_MAX_BYTES) throw tooLarge(LEGACY_MAX_BYTES);
     return { dataUrl: await readAsDataUrl(file), mimeType };
   }
-  if (file.size > cfg.maxBytes) throw new Error("File is too large");
+  if (file.size > cfg.maxBytes) throw tooLarge(cfg.maxBytes);
   const { path, token } = (await (
     await apiRequest("POST", "/api/materials/upload-url", { fileName: file.name, sizeBytes: file.size })
   ).json()) as { path: string; token: string };
@@ -69,7 +72,7 @@ export async function uploadMaterialFile(
   const { error } = await client
     .from(cfg.bucket)
     .uploadToSignedUrl(path, token, file, { contentType: mimeType, upsert: false });
-  if (error) throw new Error(error.message || "Upload failed");
+  if (error) throw new ApiError(0, "upload_failed");
   return { storagePath: path, mimeType };
 }
 

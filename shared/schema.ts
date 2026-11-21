@@ -52,7 +52,6 @@ export const passwordSchema = z
 export const googleAuthSchema = z.object({
   credential: z.string().min(1), // the Google ID token (JWT)
   role: z.enum(["teacher", "student"]).default("student"), // used only on first sign-in
-  teacherCode: z.string().optional(), // required when role is "teacher" on first sign-in
 });
 
 export const forgotPasswordSchema = z.object({

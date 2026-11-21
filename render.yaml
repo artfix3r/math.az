@@ -18,9 +18,6 @@ services:
       # Signs login cookies; Render generates a random value once.
       - key: SESSION_SECRET
         generateValue: true
-      # Code required to sign up as a teacher. Leave unset to close teacher sign-up.
-      - key: TEACHER_SIGNUP_CODE
-        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

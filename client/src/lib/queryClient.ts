@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { translateError, getCurrentLang } from "./i18n";
 
 const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
@@ -6,17 +7,33 @@ const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 // The browser sends it automatically ("credentials: include"); the client
 // never stores or sends the user id itself.
 
+/**
+ * An error from the API. `message` is already translated into the language
+ * the user picked; `code` is the server's stable error code.
+ */
+export class ApiError extends Error {
+  constructor(public status: number, public code: string, public params?: Record<string, string>) {
+    super(translateError({ code, params }, getCurrentLang()));
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      const body = await res.clone().json();
-      if (body?.message) message = body.message;
-      else message = (await res.text()) || res.statusText;
-    } catch {
-      message = (await res.text()) || res.statusText;
-    }
-    throw new Error(message);
+  if (res.ok) return;
+  let body: { code?: string; params?: Record<string, string> } = {};
+  try {
+    body = await res.json();
+  } catch {
+    // Not JSON (e.g. a host error page): show the generic message.
+  }
+  throw new ApiError(res.status, body.code ?? "generic", body.params);
+}
+
+// fetch() that turns "no connection" into a translated error.
+async function request(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${url}`, { ...init, credentials: "include" });
+  } catch {
+    throw new ApiError(0, "network");
   }
 }
 
@@ -25,11 +42,10 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${API_BASE}${url}`, {
+  const res = await request(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -42,9 +58,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
-      credentials: "include",
-    });
+    const res = await request(queryKey.join("/"), {});
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

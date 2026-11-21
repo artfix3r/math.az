@@ -47,11 +47,9 @@ function useGisReady(): boolean {
  */
 export function GoogleSignInButton({
   role,
-  teacherCode,
   onSuccess,
 }: {
   role: "teacher" | "student";
-  teacherCode?: string;
   onSuccess: (u: AuthUser) => void;
 }) {
   const { t } = useT();
@@ -63,8 +61,6 @@ export function GoogleSignInButton({
   // always reads current values.
   const roleRef = useRef(role);
   roleRef.current = role;
-  const teacherCodeRef = useRef(teacherCode);
-  teacherCodeRef.current = teacherCode;
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
 
@@ -77,9 +73,6 @@ export function GoogleSignInButton({
         const res = await apiRequest("POST", "/api/auth/google", {
           credential: response.credential,
           role: roleRef.current,
-          ...(roleRef.current === "teacher" && teacherCodeRef.current
-            ? { teacherCode: teacherCodeRef.current }
-            : {}),
         });
         const user = (await res.json()) as AuthUser;
         onSuccessRef.current(user);

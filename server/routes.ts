@@ -15,6 +15,7 @@ import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, isEmailConfigured } from "./mailer";
 import { readSessionUserId, setSession, clearSession } from "./session";
+import { attachErrorCodes, zodErrorBody } from "./errors";
 import {
   isStorageEnabled, publicStorageConfig, createUploadUrl, createDownloadUrl,
   removeFiles, teacherPrefix, MAX_UPLOAD_BYTES,
@@ -63,15 +64,8 @@ async function authUser(req: Request): Promise<User | undefined> {
   return storage.getUser(id);
 }
 
-// Teacher accounts need the code in TEACHER_SIGNUP_CODE. If it is not set,
-// nobody can sign up as a teacher (students are always allowed).
-const TEACHER_SIGNUP_CODE = process.env.TEACHER_SIGNUP_CODE || "";
-function teacherCodeOk(code: unknown): boolean {
-  return !!TEACHER_SIGNUP_CODE && typeof code === "string" && code.trim() === TEACHER_SIGNUP_CODE;
-}
-const TEACHER_CODE_ERROR = "A valid teacher sign-up code is required to create a teacher account";
-
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  attachErrorCodes(app);
   const requireUser = async (req: Request, res: Response, next: NextFunction) => {
     const user = await authUser(req);
     if (!user) return res.status(401).json({ message: "Not authenticated" });
@@ -132,10 +126,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ---------------- Auth ----------------
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { teacherCode, ...body } = req.body ?? {};
-      const data = insertUserSchema.parse({ ...body, avatarColor: randColor() });
-      if (data.role === "teacher" && !teacherCodeOk(teacherCode))
-        return res.status(403).json({ message: TEACHER_CODE_ERROR });
+      const data = insertUserSchema.parse({ ...req.body, avatarColor: randColor() });
       if (await storage.getUserByEmail(data.email))
         return res.status(409).json({ message: "Email already registered" });
       if (await storage.getUserByUsername(data.username))
@@ -145,7 +136,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Registration failed" });
     }
   });
@@ -182,7 +173,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       if (!GOOGLE_CLIENT_ID)
         return res.status(503).json({ message: "Google sign-in is not configured on the server" });
-      const { credential, role, teacherCode } = googleAuthSchema.parse(req.body);
+      const { credential, role } = googleAuthSchema.parse(req.body);
       let payload;
       try {
         const ticket = await googleClient.verifyIdToken({
@@ -213,8 +204,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       // 3) Brand-new user -> create one (no local password yet).
       if (!user) {
-        if (role === "teacher" && !teacherCodeOk(teacherCode))
-          return res.status(403).json({ message: TEACHER_CODE_ERROR });
         const username = await uniqueUsernameFromEmail(email);
         user = await storage.createUser({
           email,
@@ -229,7 +218,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Google sign-in failed" });
     }
   });
@@ -255,7 +244,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Uniform response regardless of whether the email exists.
       res.json({ ok: true });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Could not process the request" });
     }
   });
@@ -272,7 +261,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await storage.markResetTokenUsed(record.id);
       res.json({ ok: true });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Could not reset password" });
     }
   });
@@ -382,7 +371,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const data = insertQuizSchema.parse(body);
       res.json(await storage.createQuiz(data));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create quiz" });
     }
   });
@@ -399,7 +388,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const updated = await storage.updateQuiz(quiz.id, body);
       res.json(updated);
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to update quiz" });
     }
   });
@@ -611,7 +600,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const data = insertSessionSchema.parse({ ...req.body, teacherId: user.id });
       res.json(await storage.createSession(data));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create session" });
     }
   });
@@ -667,7 +656,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       res.json({ ok: true, id: saved.id });
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
@@ -744,7 +733,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(413).json({ message: `Files can be at most ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB` });
       res.json(await createUploadUrl(user.id, fileName));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       console.error("upload-url failed", e);
       res.status(500).json({ message: "Could not start the upload" });
     }
@@ -819,7 +808,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         await storage.setMaterialGroups(created.id, groupIds);
       res.json(await withGroupIds(created));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to create material" });
     }
   });
@@ -862,7 +851,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         await removeFiles([existing.storagePath]);
       res.json(await withGroupIds(updated));
     } catch (e) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
       res.status(500).json({ message: "Failed to update material" });
     }
   });
