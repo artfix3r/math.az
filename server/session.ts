@@ -52,6 +52,14 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return out;
 }
 
+/** The signed-in user id and when the session was issued, or undefined. */
+export function readSession(req: Request): { userId: number; issuedAt: number } | undefined {
+  const userId = readSessionUserId(req);
+  if (!userId) return undefined;
+  const exp = Number(parseCookies(req.headers.cookie)[SESSION_COOKIE].split(".")[1]);
+  return { userId, issuedAt: exp - SESSION_TTL_MS };
+}
+
 /** Returns the signed-in user id from the session cookie, or undefined. */
 export function readSessionUserId(req: Request): number | undefined {
   const raw = parseCookies(req.headers.cookie)[SESSION_COOKIE];

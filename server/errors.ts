@@ -51,6 +51,8 @@ export const ERROR_CODES: Record<string, string> = {
   "Invalid file": "upload_failed",
   "Links must start with http:// or https://": "invalid_url",
   "The database is not reachable right now. Please try again in a minute.": "db_unavailable",
+  "Too many attempts": "too_many_attempts",
+  "Not found": "not_found",
 };
 
 const PATTERNS: { re: RegExp; code: string; params?: (m: RegExpMatchArray) => Record<string, string> }[] = [

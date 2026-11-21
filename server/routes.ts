@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
-import { storage } from "./storage";
+import { storage, dbCounter } from "./storage";
 import {
   insertUserSchema, loginSchema, insertGroupSchema,
   insertQuizSchema, insertSessionSchema, questionSchema,
@@ -13,13 +13,15 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { buildReview, canRevealAnswers } from "@shared/review";
 import { sanitizeAnswers, isDrawing } from "@shared/answers";
+import { checkLimit, isLimited, clientIp } from "./rate-limit";
+import { sessionStillValid } from "./auth-policy";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
 import { remindersToSend, REMINDER_WINDOW_MS } from "@shared/deadlines";
 import { computeProgress } from "@shared/progress";
 import { timingSafeEqual, createHash } from "node:crypto";
-import { readSessionUserId, setSession, clearSession } from "./session";
+import { readSession, setSession, clearSession } from "./session";
 import { attachErrorCodes, zodErrorBody } from "./errors";
 import { buildVariant, gradeAnswers, answersToOriginal, variantSeed } from "@shared/quiz-variants";
 import {
@@ -65,13 +67,24 @@ function sanitize(u: User) {
 // (see ./session.ts). Nothing the client sends in headers or the body can
 // choose which user it is.
 async function authUser(req: Request): Promise<User | undefined> {
-  const id = readSessionUserId(req);
-  if (!id) return undefined;
-  return storage.getUser(id);
+  const session = readSession(req);
+  if (!session) return undefined;
+  const user = await storage.getUser(session.userId);
+  return user && sessionStillValid(session.issuedAt, user) ? user : undefined;
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   attachErrorCodes(app);
+  // Every :id in the API is a database row number; anything else is simply not found.
+  app.param("id", (req, res, next, value) => {
+    if (/^[1-9]\d{0,9}$/.test(String(value))) return next();
+    res.status(404).json({ message: "Not found" });
+  });
+  const tooMany = (res: Response, retryAfterSec: number) => {
+    res.setHeader("Retry-After", String(retryAfterSec));
+    return res.status(429).json({ message: "Too many attempts", params: { minutes: String(Math.ceil(retryAfterSec / 60)) } });
+  };
+  const MIN = 60_000;
   const requireUser = async (req: Request, res: Response, next: NextFunction) => {
     const user = await authUser(req);
     if (!user) return res.status(401).json({ message: "Not authenticated" });
@@ -138,6 +151,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ---------------- Auth ----------------
   app.post("/api/auth/register", async (req, res) => {
     try {
+      // Enough for a class signing up together from one school address.
+      const byIp = await checkLimit(dbCounter, `register-ip:${clientIp(req)}`, 100, 60 * MIN);
+      if (!byIp.allowed) return tooMany(res, byIp.retryAfterSec);
       const data = insertUserSchema.parse({ ...req.body, avatarColor: randColor() });
       if (await storage.getUserByEmail(data.email))
         return res.status(409).json({ message: "Email already registered" });
@@ -156,11 +172,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { identifier, password } = loginSchema.parse(req.body);
+      // At most 8 wrong passwords per account every 15 minutes. The per-address
+      // limit is generous because a whole class can share one school address.
+      const byIp = await checkLimit(dbCounter, `login-ip:${clientIp(req)}`, 300, 15 * MIN);
+      if (!byIp.allowed) return tooMany(res, byIp.retryAfterSec);
+      const accountKey = `login-user:${identifier.trim().toLowerCase()}`;
+      const byAccount = await isLimited(dbCounter, accountKey, 8);
+      if (!byAccount.allowed) return tooMany(res, byAccount.retryAfterSec);
       const user = identifier.includes("@")
         ? await storage.getUserByEmail(identifier)
         : await storage.getUserByUsername(identifier);
-      if (!user || !user.password || !(await bcrypt.compare(password, user.password)))
+      if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
+        await dbCounter.hit(accountKey, 15 * MIN, Date.now());
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+      await dbCounter.clear(accountKey);
       setSession(res, user.id);
       res.json(sanitize(user));
     } catch (e) {
@@ -240,6 +266,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = forgotPasswordSchema.parse(req.body);
+      // Stops the reset form being used to flood someone's inbox.
+      for (const [key, limit] of [[`forgot-ip:${clientIp(req)}`, 10], [`forgot-email:${email.toLowerCase()}`, 3]] as const) {
+        const r = await checkLimit(dbCounter, key, limit, 60 * MIN);
+        if (!r.allowed) return tooMany(res, r.retryAfterSec);
+      }
       if (!isEmailConfigured())
         return res.status(503).json({ message: "Email is not configured on the server" });
       const user = await storage.getUserByEmail(email.toLowerCase());
@@ -271,6 +302,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
       await storage.updateUserPassword(record.userId, hashed);
       await storage.markResetTokenUsed(record.id);
+      // Other devices are signed out by the password change; sign this one back in.
+      setSession(res, record.userId);
       res.json({ ok: true });
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json(zodErrorBody(e));
@@ -651,6 +684,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/feedback", async (req, res) => {
     try {
       const data = insertFeedbackSchema.parse(req.body);
+      const r = await checkLimit(dbCounter, `feedback-ip:${clientIp(req)}`, 10, 60 * MIN);
+      if (!r.allowed) return tooMany(res, r.retryAfterSec);
       const saved = await storage.createFeedback(data);
       const endpoint = process.env.FEEDBACK_FORM_ENDPOINT;
       if (endpoint) {

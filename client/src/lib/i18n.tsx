@@ -727,6 +727,7 @@ const en: Dict = {
   "pad.black": "Black ink",
   "pad.red": "Red pen",
   "pad.green": "Green pen",
+  "err.too_many_attempts": "Too many attempts. Please wait {minutes} min and try again.",
 };
 
 const az: Dict = {
@@ -1430,6 +1431,7 @@ const az: Dict = {
   "pad.black": "Qara mürəkkəb",
   "pad.red": "Qırmızı qələm",
   "pad.green": "Yaşıl qələm",
+  "err.too_many_attempts": "Çox cəhd edildi. {minutes} dəqiqə gözləyib yenidən cəhd edin.",
 };
 
 const ru: Dict = {
@@ -2133,6 +2135,7 @@ const ru: Dict = {
   "pad.black": "Чёрные чернила",
   "pad.red": "Красная ручка",
   "pad.green": "Зелёная ручка",
+  "err.too_many_attempts": "Слишком много попыток. Подождите {minutes} мин и попробуйте снова.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

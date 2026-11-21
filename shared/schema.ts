@@ -17,6 +17,8 @@ export const users = pgTable("users", {
   password: text("password"),
   // Google account subject id (the "sub" claim). Null for password-only users.
   googleId: text("google_id").unique(),
+  // When the password last changed; older sessions stop working.
+  passwordChangedAt: ts("password_changed_at"),
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("student"),
   avatarColor: text("avatar_color").notNull().default("violet"),

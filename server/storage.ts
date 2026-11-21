@@ -8,6 +8,7 @@ import type {
   ClassSession, InsertSession, Feedback, InsertFeedback,
   Material, InsertMaterial, MaterialGroup, PasswordResetToken, BankQuestion,
 } from "@shared/schema";
+import { hashResetToken } from "./auth-policy";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, inArray, desc, gte, lte } from "drizzle-orm";
@@ -166,6 +167,14 @@ ALTER TABLE submissions ADD COLUMN IF NOT EXISTS feedback TEXT NOT NULL DEFAULT 
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS comments TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS graded_at BIGINT;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS annotations TEXT NOT NULL DEFAULT '{}';
+-- Sign-in and email rate limits (server/rate-limit.ts).
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL,
+  reset_at BIGINT NOT NULL
+);
+ALTER TABLE auth_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at BIGINT;
 -- Homework deadlines and reminders.
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS due_at BIGINT;
 CREATE TABLE IF NOT EXISTS reminder_log (
@@ -299,18 +308,18 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
   async updateUserPassword(userId: number, hashedPassword: string) {
-    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+    await db.update(users).set({ password: hashedPassword, passwordChangedAt: Date.now() }).where(eq(users.id, userId));
   }
 
   // ---- password reset tokens ----
   async createResetToken(userId: number, token: string, expiresAt: number) {
     const rows = await db.insert(passwordResetTokens)
-      .values({ userId, token, expiresAt, used: 0 }).returning();
+      .values({ userId, token: hashResetToken(token), expiresAt, used: 0 }).returning();
     return rows[0];
   }
   async getResetToken(token: string) {
     const rows = await db.select().from(passwordResetTokens)
-      .where(eq(passwordResetTokens.token, token));
+      .where(eq(passwordResetTokens.token, hashResetToken(token)));
     return rows[0];
   }
   async markResetTokenUsed(id: number) {
@@ -596,3 +605,24 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+/** Rate-limit counters kept in Postgres so every serverless instance shares them. */
+export const dbCounter = {
+  async hit(key: string, windowMs: number, now: number) {
+    const rows = await client`
+      INSERT INTO auth_attempts (key, count, reset_at) VALUES (${key}, 1, ${now + windowMs})
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN auth_attempts.reset_at <= ${now} THEN 1 ELSE auth_attempts.count + 1 END,
+        reset_at = CASE WHEN auth_attempts.reset_at <= ${now} THEN ${now + windowMs} ELSE auth_attempts.reset_at END
+      RETURNING count, reset_at`;
+    return { count: Number(rows[0].count), resetAt: Number(rows[0].reset_at) };
+  },
+  async peek(key: string, now: number) {
+    const rows = await client`SELECT count, reset_at FROM auth_attempts WHERE key = ${key}`;
+    if (!rows.length || Number(rows[0].reset_at) <= now) return { count: 0, resetAt: now };
+    return { count: Number(rows[0].count), resetAt: Number(rows[0].reset_at) };
+  },
+  async clear(key: string) {
+    await client`DELETE FROM auth_attempts WHERE key = ${key}`;
+  },
+};
