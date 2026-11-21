@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   FileQuestion, Plus, Clock, CalendarClock, BarChart3, Pencil, Trash2,
-  Archive, Play, CheckCircle2, Hourglass,
+  Archive, Play, CheckCircle2, Hourglass, Printer,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import type { Quiz, Question } from "@shared/schema";
@@ -86,6 +86,7 @@ function TeacherQuizzes() {
                 <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
                   <Link href={`/quizzes/${q.id}/results`}><Button size="sm" variant="outline" className="gap-1.5 font-bold" data-testid={`button-results-${q.id}`}><BarChart3 className="h-3.5 w-3.5" /> {t("quiz.results")}</Button></Link>
                   <Link href={`/quizzes/${q.id}/edit`}><Button size="sm" variant="outline" className="gap-1.5 font-bold"><Pencil className="h-3.5 w-3.5" /> {t("common.edit")}</Button></Link>
+                  <Link href={`/quizzes/${q.id}/print`}><Button size="sm" variant="outline" className="gap-1.5 font-bold" data-testid={`button-print-${q.id}`}><Printer className="h-3.5 w-3.5" /> {t("print.button")}</Button></Link>
                   <Button size="sm" variant="outline" className="gap-1.5 font-bold" onClick={() => saveTemplate.mutate(q.id)} data-testid={`button-backup-${q.id}`}><Archive className="h-3.5 w-3.5" /> {t("quiz.backup")}</Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

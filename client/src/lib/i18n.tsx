@@ -515,6 +515,18 @@ const en: Dict = {
   "math.sin": "Sine",
   "math.integral": "Integral",
   "math.sum": "Sum",
+  // --- Printing ---
+  "print.button": "Print",
+  "print.back": "Back to quizzes",
+  "print.includeKey": "Include answer key",
+  "print.print": "Print / Save as PDF",
+  "print.hint": "In the print window, choose \"Save as PDF\" as the printer to get a PDF file. The answer key prints on its own page.",
+  "print.name": "Name",
+  "print.class": "Class",
+  "print.date": "Date",
+  "print.summary": "{count} questions · {points} points · {minutes} min",
+  "print.points": "{n} pt",
+  "print.keyTitle": "Answer key: {title}",
 };
 
 const az: Dict = {
@@ -1006,6 +1018,18 @@ const az: Dict = {
   "math.sin": "Sinus",
   "math.integral": "İnteqral",
   "math.sum": "Cəm",
+  // --- Printing ---
+  "print.button": "Çap et",
+  "print.back": "Testlərə qayıt",
+  "print.includeKey": "Cavab açarını əlavə et",
+  "print.print": "Çap et / PDF kimi saxla",
+  "print.hint": "Çap pəncərəsində printer olaraq \"PDF kimi saxla\" seçin və PDF fayl alın. Cavab açarı ayrıca səhifədə çap olunur.",
+  "print.name": "Ad, soyad",
+  "print.class": "Sinif",
+  "print.date": "Tarix",
+  "print.summary": "{count} sual · {points} bal · {minutes} dəq",
+  "print.points": "{n} bal",
+  "print.keyTitle": "Cavab açarı: {title}",
 };
 
 const ru: Dict = {
@@ -1497,6 +1521,18 @@ const ru: Dict = {
   "math.sin": "Синус",
   "math.integral": "Интеграл",
   "math.sum": "Сумма",
+  // --- Printing ---
+  "print.button": "Печать",
+  "print.back": "Назад к тестам",
+  "print.includeKey": "Добавить ключ ответов",
+  "print.print": "Печать / Сохранить как PDF",
+  "print.hint": "В окне печати выберите принтер «Сохранить как PDF», чтобы получить PDF-файл. Ключ ответов печатается на отдельной странице.",
+  "print.name": "Имя",
+  "print.class": "Класс",
+  "print.date": "Дата",
+  "print.summary": "{count} вопросов · {points} баллов · {minutes} мин",
+  "print.points": "{n} б.",
+  "print.keyTitle": "Ключ ответов: {title}",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

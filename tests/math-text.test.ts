@@ -45,3 +45,8 @@ test("a broken formula is shown as its source text instead of crashing", () => {
 test("line breaks in plain text are kept", () => {
   assert.match(renderMathHtml("line one\nline two"), /line one<br>line two/);
 });
+
+test("fractions inside a sentence are drawn full size, not shrunk", () => {
+  // KaTeX shrinks inline fraction digits with these size classes.
+  assert.doesNotMatch(renderMathHtml("Add $\\frac{3}{4}$"), /reset-size6 size3/);
+});

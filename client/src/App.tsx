@@ -24,6 +24,7 @@ import MyResults from "@/pages/my-results";
 import Feedback from "@/pages/feedback";
 import ResetPassword from "@/pages/reset-password";
 import { AppShell } from "@/pages/shell";
+import PrintQuiz from "@/pages/print-quiz";
 import { Loader2 } from "lucide-react";
 
 function ThemeInit() {
@@ -34,7 +35,7 @@ function ThemeInit() {
   return null;
 }
 
-function Protected({ children }: { children: React.ReactNode }) {
+function Protected({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
   const { user, loading } = useAuth();
   const [, navigate] = useLocation();
   useEffect(() => {
@@ -50,7 +51,7 @@ function Protected({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return null;
-  return <AppShell>{children}</AppShell>;
+  return bare ? <>{children}</> : <AppShell>{children}</AppShell>;
 }
 
 function AppRouter() {
@@ -64,6 +65,7 @@ function AppRouter() {
       <Route path="/quizzes/new">{() => <Protected><QuizBuilder /></Protected>}</Route>
       <Route path="/quizzes/:id/edit">{(p) => <Protected><QuizBuilder id={Number(p.id)} /></Protected>}</Route>
       <Route path="/quizzes/:id/results">{(p) => <Protected><QuizResults id={Number(p.id)} /></Protected>}</Route>
+      <Route path="/quizzes/:id/print">{(p) => <Protected bare><PrintQuiz id={Number(p.id)} /></Protected>}</Route>
       <Route path="/quizzes/:id/take">{(p) => <Protected><TakeQuiz id={Number(p.id)} /></Protected>}</Route>
       <Route path="/library">{() => <Protected><Library /></Protected>}</Route>
       <Route path="/materials">{() => <Protected><Materials /></Protected>}</Route>

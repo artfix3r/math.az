@@ -48,7 +48,10 @@ export function renderMathHtml(input: string): string {
     .map((seg) => {
       if (seg.kind === "text") return escapeHtml(seg.value).replace(/\n/g, "<br>");
       try {
-        return katex.renderToString(seg.value, {
+        // \displaystyle keeps fractions and limits full size inside sentences,
+        // which is easier to read for school maths.
+        const src = seg.kind === "inline" ? `\\displaystyle ${seg.value}` : seg.value;
+        return katex.renderToString(src, {
           displayMode: seg.kind === "display",
           throwOnError: true,
           trust: false,
