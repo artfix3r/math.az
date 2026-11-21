@@ -27,6 +27,7 @@ import { AppShell } from "@/pages/shell";
 import PrintQuiz from "@/pages/print-quiz";
 import { MyProgress, StudentProgress } from "@/pages/progress";
 import ParentView from "@/pages/parent-view";
+import ResultDetail from "@/pages/result-detail";
 import { Loader2 } from "lucide-react";
 
 // The theme is chosen before first paint in main.tsx (saved choice, else the system setting).
@@ -72,6 +73,7 @@ function AppRouter() {
       <Route path="/sessions">{() => <Protected><Sessions /></Protected>}</Route>
       <Route path="/progress">{() => <Protected><MyProgress /></Protected>}</Route>
       <Route path="/students/:id/progress">{(p) => <Protected><StudentProgress id={Number(p.id)} /></Protected>}</Route>
+      <Route path="/results/:id">{(p) => <Protected><ResultDetail id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
       <Route path="/feedback" component={Feedback} />
       <Route path="/parent/:token">{(p) => <ParentView token={p.token} />}</Route>

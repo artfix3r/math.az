@@ -700,6 +700,17 @@ const en: Dict = {
   "math.dotProduct": "Dot product",
   "imp.docLang": "Language of the page:",
   "imp.photoTips": "For the best result: photograph one page straight from above in good light, and keep the text sharp and filling the frame.",
+  "qr.commentPlaceholder": "Comment for the student on this question (optional)",
+  "qr.feedbackLabel": "Note on the whole work",
+  "qr.feedbackPlaceholder": "e.g. Well done! Revise fractions before Friday.",
+  "qr.feedbackHint": "The student sees your marks and comments in red pen on their work.",
+  "rv.back": "My results",
+  "rv.notFound": "This work could not be found.",
+  "rv.handedIn": "Handed in {date}",
+  "rv.teacherNote": "Teacher's note",
+  "rv.yourAnswer": "Your answer",
+  "rv.partly": "Partly right",
+  "rv.answersLater": "Correct answers appear here after the deadline or once you have no attempts left.",
 };
 
 const az: Dict = {
@@ -1376,6 +1387,17 @@ const az: Dict = {
   "math.dotProduct": "Skalyar hasil",
   "imp.docLang": "Səhifənin dili:",
   "imp.photoTips": "Ən yaxşı nəticə üçün: səhifəni yuxarıdan düz, yaxşı işıqda çəkin; mətn aydın olsun və kadrı doldursun.",
+  "qr.commentPlaceholder": "Bu sual üzrə şagirdə şərh (istəyə bağlı)",
+  "qr.feedbackLabel": "Bütün iş üzrə qeyd",
+  "qr.feedbackPlaceholder": "məs. Afərin! Cümə gününə qədər kəsrləri təkrarla.",
+  "qr.feedbackHint": "Şagird qiymətlərinizi və şərhlərinizi öz işində qırmızı qələmlə görür.",
+  "rv.back": "Nəticələrim",
+  "rv.notFound": "Bu iş tapılmadı.",
+  "rv.handedIn": "Təhvil verilib: {date}",
+  "rv.teacherNote": "Müəllimin qeydi",
+  "rv.yourAnswer": "Sizin cavab",
+  "rv.partly": "Qismən düzdür",
+  "rv.answersLater": "Düzgün cavablar son tarixdən sonra və ya cəhdləriniz bitdikdə burada görünəcək.",
 };
 
 const ru: Dict = {
@@ -2052,6 +2074,17 @@ const ru: Dict = {
   "math.dotProduct": "Скалярное произведение",
   "imp.docLang": "Язык страницы:",
   "imp.photoTips": "Для лучшего результата: снимайте страницу прямо сверху при хорошем свете, текст должен быть чётким и занимать весь кадр.",
+  "qr.commentPlaceholder": "Комментарий ученику к этому вопросу (необязательно)",
+  "qr.feedbackLabel": "Отзыв обо всей работе",
+  "qr.feedbackPlaceholder": "напр. Молодец! Повтори дроби до пятницы.",
+  "qr.feedbackHint": "Ученик увидит ваши оценки и комментарии красной ручкой в своей работе.",
+  "rv.back": "Мои результаты",
+  "rv.notFound": "Работа не найдена.",
+  "rv.handedIn": "Сдано: {date}",
+  "rv.teacherNote": "Отзыв учителя",
+  "rv.yourAnswer": "Ваш ответ",
+  "rv.partly": "Частично верно",
+  "rv.answersLater": "Правильные ответы появятся после срока сдачи или когда закончатся попытки.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

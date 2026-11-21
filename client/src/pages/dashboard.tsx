@@ -95,7 +95,7 @@ function StudentFirst() {
         {!subs ? (
           <Skeleton className="h-44 w-full rounded-lg" />
         ) : latest ? (
-          <Link href="/results" className="block">
+          <Link href={`/results/${latest.id}`} className="block">
             <article className="paper-margin flex h-full min-h-[8.5rem] flex-col rounded-lg border bg-card py-5 pl-14 pr-5 shadow-sm transition-colors hover:border-primary/40 sm:pl-16" data-testid="card-latest-result">
               <h3 className="font-semibold leading-snug">{latest.quizTitle}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(latest.submittedAt)}</p>

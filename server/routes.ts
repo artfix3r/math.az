@@ -11,6 +11,7 @@ import {
 import type { Question, Quiz, User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { buildReview, canRevealAnswers } from "@shared/review";
 import { randomBytes } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
@@ -474,16 +475,48 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(sub);
   });
 
-  // Teacher grades open/photo questions
+  // Teacher marks the work: points per question (overriding the automatic
+  // marking if needed), a comment per question, and a note on the whole work.
+  const gradeSchema = z.object({
+    score: z.number().int().min(0),
+    needsGrading: z.union([z.boolean(), z.number()]).optional(),
+    gradedPoints: z.union([z.string(), z.record(z.number())]).optional(),
+    comments: z.record(z.string().max(1000)).optional(),
+    feedback: z.string().max(3000).optional(),
+  });
   app.patch("/api/submissions/:id/grade", requireUser, requireTeacher, async (req, res) => {
     const sub = await ownedSubmission(req, res, Number(req.params.id));
     if (!sub) return;
-    const { score, needsGrading, gradedPoints } = req.body;
+    const parsed = gradeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(zodErrorBody(parsed.error));
+    const body = parsed.data;
+    const comments = Object.fromEntries(Object.entries(body.comments ?? {}).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
     const updated = await storage.updateSubmission(sub.id, {
-      score, needsGrading: needsGrading ? 1 : 0,
-      gradedPoints: typeof gradedPoints === "string" ? gradedPoints : JSON.stringify(gradedPoints ?? {}),
+      score: Math.min(body.score, sub.maxScore),
+      needsGrading: body.needsGrading ? 1 : 0,
+      gradedPoints: typeof body.gradedPoints === "string" ? body.gradedPoints : JSON.stringify(body.gradedPoints ?? {}),
+      comments: JSON.stringify(comments),
+      feedback: (body.feedback ?? "").trim(),
+      gradedAt: Date.now(),
     });
     res.json(updated);
+  });
+
+  // A student's own marked work, question by question.
+  app.get("/api/my/submissions/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const sub = await storage.getSubmissionById(Number(req.params.id));
+    if (!sub || sub.studentId !== user.id) return notFound(res, "Submission");
+    const quiz = await storage.getQuiz(sub.quizId);
+    if (!quiz) return notFound(res, "Quiz");
+    const questions = JSON.parse(quiz.questions || "[]");
+    const reveal = canRevealAnswers(quiz, sub, Date.now());
+    res.json({
+      id: sub.id, quizId: quiz.id, quizTitle: quiz.title, score: sub.score, maxScore: sub.maxScore,
+      needsGrading: sub.needsGrading, submittedAt: sub.submittedAt, gradedAt: sub.gradedAt,
+      feedback: sub.feedback, revealed: reveal,
+      items: buildReview(questions, sub, reveal),
+    });
   });
 
   app.get("/api/quizzes/:id/submissions", requireUser, requireTeacher, async (req, res) => {

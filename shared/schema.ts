@@ -182,6 +182,10 @@ export const submissions = pgTable("submissions", {
   attemptNumber: integer("attempt_number").notNull().default(1),
   // JSON array of the question ids this student was shown ("" = all of them).
   questionIds: text("question_ids").notNull().default(""),
+  // Teacher's feedback: a note on the whole work, and JSON questionId -> comment.
+  feedback: text("feedback").notNull().default(""),
+  comments: text("comments").notNull().default("{}"),
+  gradedAt: ts("graded_at"),
   submittedAt: ts("submitted_at").notNull(),
 });
 
