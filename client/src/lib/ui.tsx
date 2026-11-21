@@ -15,17 +15,19 @@ export function colorOf(c?: string) {
   return COLOR_MAP[c ?? "blue"] ?? COLOR_MAP.blue;
 }
 
-/** A square of squared paper with a red-pen tick, then the wordmark. */
+/** A green line with three stations, then the wordmark. */
 export function Logo({ className, inverted }: { className?: string; inverted?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5 font-semibold tracking-tight", className)}>
+    <span className={cn("inline-flex items-center gap-2.5 font-bold tracking-tight", className)}>
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className="shrink-0">
-        <rect x="0.75" y="0.75" width="26.5" height="26.5" rx="5" fill="#fff" stroke={inverted ? "#fff" : "#2340A0"} strokeWidth="1.5" />
-        <path d="M7 1v26M14 1v26M21 1v26M1 7h26M1 14h26M1 21h26" stroke="#C9D6F0" strokeWidth="1" />
-        <path d="M7.5 14.5l4 4.5L21 8.5" stroke="#D92D2D" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        <rect width="28" height="28" rx="8" fill={inverted ? "#F5B700" : "#0A7B55"} />
+        <path d="M5 14h18" stroke={inverted ? "#16191D" : "#fff"} strokeWidth="2.2" strokeLinecap="round" />
+        <circle cx="7" cy="14" r="2.3" fill={inverted ? "#F5B700" : "#0A7B55"} stroke={inverted ? "#16191D" : "#fff"} strokeWidth="1.6" />
+        <circle cx="14" cy="14" r="2.3" fill={inverted ? "#F5B700" : "#0A7B55"} stroke={inverted ? "#16191D" : "#fff"} strokeWidth="1.6" />
+        <circle cx="21" cy="14" r="3" fill={inverted ? "#16191D" : "#fff"} />
       </svg>
       <span className={cn(inverted ? "text-white" : "text-foreground")}>
-        math<span className={inverted ? "text-white/60" : "text-muted-foreground"}>.az</span>
+        math<span className={inverted ? "text-white/55" : "text-muted-foreground"}>.az</span>
       </span>
     </span>
   );

@@ -122,9 +122,19 @@ export default function TakeQuiz({ id }: { id: number }) {
         <Link href="/quizzes" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> {t("tq.leave")}
         </Link>
-        <span className="flex-1 text-center text-xs text-muted-foreground tabular-nums" aria-live="polite">
-          {t("tq.answered", { n: answeredCount, total: questions.length })}
-        </span>
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+          <ol className="flex items-center" aria-hidden="true">
+            {questions.map((q, i) => (
+              <li key={q.id} className="flex items-center">
+                {i > 0 && <span className={cn("h-[3px] w-3 sm:w-5", isAnswered(q) ? "bg-primary" : "bg-border")} />}
+                <span className={cn("h-2.5 w-2.5 rounded-full border-2", isAnswered(q) ? "border-primary bg-primary" : "border-muted-foreground/50 bg-card")} />
+              </li>
+            ))}
+          </ol>
+          <span className="text-[11px] text-muted-foreground tabular-nums" aria-live="polite">
+            {t("tq.answered", { n: answeredCount, total: questions.length })}
+          </span>
+        </div>
         <div
           role="timer"
           aria-label={t("tq.timeLeft")}
@@ -144,9 +154,8 @@ export default function TakeQuiz({ id }: { id: number }) {
         <ol>
           {questions.map((q, idx) => (
             <li key={q.id} className="relative border-b border-[hsl(var(--grid-line))] py-5 pl-12 pr-4 last:border-b-0 sm:pl-16 sm:pr-6" data-testid={`take-question-${idx}`}>
-              <span className={cn("absolute left-0 top-5 w-8 text-right text-[15px] font-semibold tabular-nums sm:w-12",
-                isAnswered(q) ? "text-primary" : "text-muted-foreground")} aria-hidden="true">
-                {idx + 1}.
+              <span className={cn("station top-5 tabular-nums", isAnswered(q) ? "!bg-primary text-primary-foreground" : "text-foreground")} aria-hidden="true">
+                {idx + 1}
               </span>
               <div className="flex items-start gap-3">
                 <p className="min-w-0 flex-1 text-[17px] font-medium leading-relaxed">

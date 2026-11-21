@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT, formatDateTime } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { DueBadge } from "@/components/due-badge";
 import { PenScore, PenRemark, remarkKey } from "@/components/red-pen";
 import { nextUp, latestResult, teacherAgenda } from "@shared/dashboard";
 import { Plus, ArrowRight, Video, Clock, ListChecks, ChevronRight } from "lucide-react";
@@ -68,16 +67,24 @@ function StudentFirst() {
         {!quizzes ? (
           <Skeleton className="h-44 w-full rounded-lg" />
         ) : next ? (
-          <article className="rounded-lg border bg-card p-5 shadow-sm sm:p-6" data-testid="card-next-up">
-            <h3 className="text-xl font-semibold leading-snug">{next.title}</h3>
-            {next.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{next.description}</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-              {next.dueAt ? <DueBadge dueAt={next.dueAt} /> : <span>{t("dash.noDeadline")}</span>}
+          <article className="dark rounded-lg bg-board p-5 text-foreground shadow-md sm:p-6" data-testid="card-next-up">
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-xl font-semibold leading-snug text-white">{next.title}</h3>
+              {next.dueAt && (
+                <span className="shrink-0 text-right font-semibold tabular-nums text-signal">
+                  <span className="block text-[11px] font-medium text-white/60">{t("due.label").split(" (")[0]}</span>
+                  {formatDateTime(next.dueAt).replace(/^.*?(\d{1,2}:\d{2})$/, "$1")}
+                </span>
+              )}
+            </div>
+            {next.description && <p className="mt-1 line-clamp-2 text-sm text-white/65">{next.description}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/70">
+              {next.dueAt ? <span>{formatDateTime(next.dueAt)}</span> : <span>{t("dash.noDeadline")}</span>}
               <span className="inline-flex items-center gap-1.5"><ListChecks className="h-4 w-4" />{t("dash.questions", { n: questionCount(next) })}</span>
               <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" />{t("dash.minutes", { n: next.durationMinutes })}</span>
             </div>
             <Link href={`/quizzes/${next.id}/take`}>
-              <Button size="lg" className="mt-5 w-full gap-2 sm:w-auto" data-testid="button-start-next">
+              <Button size="lg" className="mt-5 w-full gap-2 border-signal bg-signal text-board hover:bg-signal sm:w-auto" data-testid="button-start-next">
                 {t("dash.start")} <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -96,7 +103,7 @@ function StudentFirst() {
           <Skeleton className="h-44 w-full rounded-lg" />
         ) : latest ? (
           <Link href="/results" className="block">
-            <article className="paper-margin flex h-full min-h-[8.5rem] flex-col rounded-lg border bg-card py-5 pl-14 pr-5 shadow-sm transition-colors hover:border-primary/40 sm:pl-16" data-testid="card-latest-result">
+            <article className="flex h-full min-h-[8.5rem] flex-col rounded-lg border bg-card p-5 shadow-sm transition-colors hover:border-primary/40" data-testid="card-latest-result">
               <h3 className="font-semibold leading-snug">{latest.quizTitle}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(latest.submittedAt)}</p>
               <div className="mt-auto flex items-end justify-between gap-3 pt-4">

@@ -74,7 +74,7 @@ function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute("content", dark ? "#0D121D" : "#EEF1F6");
+    meta?.setAttribute("content", dark ? "#0F1114" : "#F1F2EF");
     try { localStorage.setItem("mathaz-theme", dark ? "dark" : "light"); } catch { /* storage unavailable */ }
   }, [dark]);
   return { dark, toggle: () => setDark((d) => !d) };
@@ -131,7 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                   active
-                    ? "bg-card text-primary shadow-sm"
+                    ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
                 )}
               >

@@ -1,51 +1,36 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The teacher's red pen. Used only for judgement: a circled score, a tick or
- * cross next to an answer, and a short handwritten remark. Nothing else in the
- * interface is drawn in this colour or this hand.
+ * Metro direction: a result is a station roundel. The ring colour says how it
+ * went (line green, amber, red), the number sits inside in bold signage type.
+ * File and export names are shared with the notebook direction so pages don't change.
  */
 
-// A slightly wobbly, not-quite-closed loop, like a score circled in a hurry.
-const LOOP = "M8 30 C 6 14, 30 4, 58 6 C 86 8, 98 20, 96 32 C 94 46, 70 54, 46 53 C 22 52, 6 44, 10 28 C 12 20, 20 14, 30 11";
+function tone(pct: number) {
+  return pct >= 75 ? "text-correct" : pct >= 50 ? "text-due" : "text-pen";
+}
 
 export function PenScore({
-  score,
-  max,
-  size = "md",
-  animate = true,
-  className,
-  label,
+  score, max, size = "md", animate = true, className, label,
 }: {
-  score: number;
-  max: number;
-  size?: "sm" | "md" | "lg";
-  animate?: boolean;
-  className?: string;
-  /** Accessible text, e.g. "Score 8 of 10". */
-  label?: string;
+  score: number; max: number; size?: "sm" | "md" | "lg"; animate?: boolean; className?: string; label?: string;
 }) {
-  const dims = { sm: "h-9 w-[4.25rem] text-xl", md: "h-14 w-[6.5rem] text-[2rem]", lg: "h-20 w-36 text-5xl" }[size];
+  const pct = max ? (score / max) * 100 : 0;
+  const dims = { sm: "h-11 w-11 text-[13px]", md: "h-16 w-16 text-lg", lg: "h-24 w-24 text-2xl" }[size];
+  const C = 2 * Math.PI * 44;
   return (
-    <span
-      role="img"
-      aria-label={label ?? `${score}/${max}`}
-      className={cn("relative inline-flex shrink-0 items-center justify-center text-pen", dims, className)}
-    >
-      <svg viewBox="0 0 104 60" className="absolute inset-0 h-full w-full overflow-visible" fill="none" aria-hidden="true">
-        <path
-          d={LOOP}
-          stroke="currentColor"
-          strokeWidth={size === "sm" ? 3.2 : 2.6}
-          strokeLinecap="round"
-          className={animate ? "pen-stroke" : undefined}
-          style={{ ["--pen-len" as any]: 290 }}
+    <span role="img" aria-label={label ?? `${score}/${max}`} className={cn("relative inline-flex shrink-0 items-center justify-center", dims, tone(pct), className)}>
+      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="10" />
+        <circle
+          cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)}
+          className={animate ? "pen-ring" : undefined}
+          style={{ ["--ring-len" as any]: C }}
         />
       </svg>
-      <span className="font-hand relative leading-none tabular-nums" aria-hidden="true">
-        {score}
-        <span className="opacity-80">/</span>
-        {max}
+      <span className="relative font-bold leading-none tabular-nums text-foreground" aria-hidden="true">
+        {score}<span className="text-muted-foreground">/{max}</span>
       </span>
     </span>
   );
@@ -53,29 +38,21 @@ export function PenScore({
 
 export function PenMark({ correct, className, label }: { correct: boolean; className?: string; label?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={cn("h-6 w-6 shrink-0", correct ? "text-correct" : "text-pen", className)}
-      fill="none"
-      role="img"
-      aria-label={label ?? (correct ? "✓" : "✗")}
-    >
-      {correct ? (
-        <path d="M3.5 13.5c2 1.4 3.6 3.2 5 5.5C11 12.5 15.5 7 21 3.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      ) : (
-        <path d="M5 5c4.5 4.2 9 9.2 14 14.5M19 4.5C13.8 9.5 9 14.5 4.5 19.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-      )}
-    </svg>
+    <span role="img" aria-label={label ?? (correct ? "✓" : "✗")}
+      className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white", correct ? "bg-correct" : "bg-pen", className)}>
+      <svg viewBox="0 0 24 24" className="h-[60%] w-[60%]" fill="none" aria-hidden="true">
+        {correct
+          ? <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+          : <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />}
+      </svg>
+    </span>
   );
 }
 
 export function PenRemark({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span className={cn("font-hand inline-block -rotate-1 text-xl leading-tight text-pen", className)}>{children}</span>
-  );
+  return <span className={cn("inline-block text-sm font-semibold text-foreground", className)}>{children}</span>;
 }
 
-/** A short handwritten verdict for a percentage, in the student's language. */
 export function remarkKey(pct: number): string {
   if (pct >= 90) return "pen.excellent";
   if (pct >= 75) return "pen.good";

@@ -1,9 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "@fontsource-variable/onest";
-import "@fontsource/caveat/latin-600.css";
-import "@fontsource/caveat/latin-ext-600.css";
-import "@fontsource/caveat/cyrillic-600.css";
+import "@fontsource-variable/golos-text";
 import "katex/dist/katex.min.css";
 import "./index.css";
 

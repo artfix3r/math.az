@@ -6,9 +6,9 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".375rem", /* 6px */
-        md: ".3125rem", /* 5px */
-        sm: ".1875rem", /* 3px */
+        lg: ".75rem", /* 12px */
+        md: ".5rem", /* 8px */
+        sm: ".375rem", /* 6px */
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -55,6 +55,8 @@ export default {
         pen: "hsl(var(--pen) / <alpha-value>)",
         correct: "hsl(var(--correct) / <alpha-value>)",
         due: "hsl(var(--due) / <alpha-value>)",
+        signal: "hsl(var(--signal) / <alpha-value>)",
+        board: "hsl(var(--board) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
