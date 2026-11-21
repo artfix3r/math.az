@@ -16,7 +16,7 @@ import { OAuth2Client } from "google-auth-library";
 import { sendResetEmail, sendReminderEmail, isEmailConfigured } from "./mailer";
 import { remindersToSend, REMINDER_WINDOW_MS } from "@shared/deadlines";
 import { computeProgress } from "@shared/progress";
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash } from "node:crypto";
 import { readSessionUserId, setSession, clearSession } from "./session";
 import { attachErrorCodes, zodErrorBody } from "./errors";
 import { buildVariant, gradeAnswers, answersToOriginal, variantSeed } from "@shared/quiz-variants";
@@ -876,6 +876,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!student || student.role !== "student" || !(await teachesStudent(user.id, student.id)))
       return notFound(res, "Student");
     res.json({ student: { id: student.id, fullName: student.fullName }, ...(await progressFor(student.id, user.id)) });
+  });
+
+  // ---- Parent links: read-only progress for a parent, no sign-in ----
+  const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+  async function newParentLink(studentId: number, createdBy: number) {
+    const token = randomBytes(32).toString("base64url");
+    await storage.setParentLink(studentId, hashToken(token), createdBy);
+    return { token, url: `${APP_BASE_URL}/#/parent/${token}` };
+  }
+  const requireStudent = (req: Request, res: Response, next: NextFunction) =>
+    ((req as any).user as User).role === "student" ? next() : res.status(403).json({ message: "Students only" });
+
+  app.get("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    const link = await storage.getParentLinkByStudent(((req as any).user as User).id);
+    res.json(link ? { active: true, createdAt: link.createdAt } : { active: false });
+  });
+  app.post("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    const user = (req as any).user as User;
+    res.json(await newParentLink(user.id, user.id));
+  });
+  app.delete("/api/parent-link", requireUser, requireStudent, async (req, res) => {
+    await storage.deleteParentLink(((req as any).user as User).id);
+    res.json({ ok: true });
+  });
+  app.post("/api/students/:id/parent-link", requireUser, requireTeacher, async (req, res) => {
+    const user = (req as any).user as User;
+    const student = await storage.getUser(Number(req.params.id));
+    if (!student || student.role !== "student" || !(await teachesStudent(user.id, student.id)))
+      return notFound(res, "Student");
+    res.json(await newParentLink(student.id, user.id));
+  });
+  // Public: anyone with the link. Shows the child's name and progress only.
+  app.get("/api/parent/:token", async (req, res) => {
+    const token = String(req.params.token || "");
+    const studentId = token.length >= 40 ? await storage.getStudentIdByParentToken(hashToken(token)) : undefined;
+    const student = studentId ? await storage.getUser(studentId) : undefined;
+    if (!student) return notFound(res, "Link");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.json({ student: { fullName: student.fullName }, ...(await progressFor(student.id)) });
   });
 
   // ---- Homework reminders ----

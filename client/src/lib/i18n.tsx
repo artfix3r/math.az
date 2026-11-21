@@ -583,6 +583,24 @@ const en: Dict = {
   "prog.trend.up": "Improving",
   "prog.trend.down": "Slipping",
   "prog.trend.steady": "Steady",
+  // --- Parent links ---
+  "err.students_only": "Only students can do this.",
+  "parent.title": "Share with a parent",
+  "parent.desc": "Create a private link so a parent can see this progress page without signing in. They can't change anything.",
+  "parent.create": "Create parent link",
+  "parent.newLink": "Make a new link",
+  "parent.newLinkHint": "Making a new link switches the old one off.",
+  "parent.copy": "Copy",
+  "parent.copied": "Link copied",
+  "parent.onlyOnce": "Copy it now: for safety, the full link is only shown once.",
+  "parent.activeSince": "A parent link is active (made {date}).",
+  "parent.turnOff": "Switch link off",
+  "parent.turnedOff": "Parent link switched off",
+  "parent.failed": "Could not create the link",
+  "parent.invalidTitle": "This link doesn't work",
+  "parent.invalidDesc": "It may have been switched off or replaced with a new one. Ask for a new link.",
+  "parent.viewLabel": "Progress report",
+  "parent.viewSub": "Read-only view shared with you from math.az.",
 };
 
 const az: Dict = {
@@ -1142,6 +1160,24 @@ const az: Dict = {
   "prog.trend.up": "Yaxşılaşır",
   "prog.trend.down": "Zəifləyir",
   "prog.trend.steady": "Sabit",
+  // --- Parent links ---
+  "err.students_only": "Bunu yalnız şagirdlər edə bilər.",
+  "parent.title": "Valideynlə paylaş",
+  "parent.desc": "Valideynin daxil olmadan bu inkişaf səhifəsini görməsi üçün şəxsi link yaradın. Valideyn heç nəyi dəyişə bilməz.",
+  "parent.create": "Valideyn linki yarat",
+  "parent.newLink": "Yeni link yarat",
+  "parent.newLinkHint": "Yeni link yaratdıqda köhnəsi deaktiv olur.",
+  "parent.copy": "Kopyala",
+  "parent.copied": "Link kopyalandı",
+  "parent.onlyOnce": "İndi kopyalayın: təhlükəsizlik üçün tam link yalnız bir dəfə göstərilir.",
+  "parent.activeSince": "Valideyn linki aktivdir ({date} yaradılıb).",
+  "parent.turnOff": "Linki deaktiv et",
+  "parent.turnedOff": "Valideyn linki deaktiv edildi",
+  "parent.failed": "Link yaratmaq mümkün olmadı",
+  "parent.invalidTitle": "Bu link işləmir",
+  "parent.invalidDesc": "Link deaktiv edilmiş və ya yenisi ilə əvəz olunmuş ola bilər. Yeni link istəyin.",
+  "parent.viewLabel": "İnkişaf hesabatı",
+  "parent.viewSub": "math.az-dan sizinlə paylaşılmış, yalnız baxış üçün səhifə.",
 };
 
 const ru: Dict = {
@@ -1701,6 +1737,24 @@ const ru: Dict = {
   "prog.trend.up": "Улучшается",
   "prog.trend.down": "Ухудшается",
   "prog.trend.steady": "Стабильно",
+  // --- Parent links ---
+  "err.students_only": "Это могут делать только ученики.",
+  "parent.title": "Поделиться с родителем",
+  "parent.desc": "Создайте личную ссылку, чтобы родитель мог видеть эту страницу прогресса без входа. Изменить ничего нельзя.",
+  "parent.create": "Создать ссылку для родителя",
+  "parent.newLink": "Создать новую ссылку",
+  "parent.newLinkHint": "Новая ссылка отключает старую.",
+  "parent.copy": "Копировать",
+  "parent.copied": "Ссылка скопирована",
+  "parent.onlyOnce": "Скопируйте сейчас: из соображений безопасности полная ссылка показывается только один раз.",
+  "parent.activeSince": "Ссылка для родителя активна (создана {date}).",
+  "parent.turnOff": "Отключить ссылку",
+  "parent.turnedOff": "Ссылка для родителя отключена",
+  "parent.failed": "Не удалось создать ссылку",
+  "parent.invalidTitle": "Эта ссылка не работает",
+  "parent.invalidDesc": "Возможно, её отключили или заменили новой. Попросите новую ссылку.",
+  "parent.viewLabel": "Отчёт о прогрессе",
+  "parent.viewSub": "Страница только для просмотра, которой с вами поделились на math.az.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, az, ru };

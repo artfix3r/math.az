@@ -1,6 +1,6 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
-  materials, materialGroups, passwordResetTokens, bankQuestions, reminderLog,
+  materials, materialGroups, passwordResetTokens, bankQuestions, reminderLog, parentLinks,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
@@ -171,6 +171,15 @@ CREATE TABLE IF NOT EXISTS reminder_log (
   UNIQUE (quiz_id, student_id)
 );
 ALTER TABLE reminder_log ENABLE ROW LEVEL SECURITY;
+-- Parent links (read-only progress links).
+CREATE TABLE IF NOT EXISTS parent_links (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL UNIQUE,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_by INTEGER NOT NULL,
+  created_at BIGINT NOT NULL
+);
+ALTER TABLE parent_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
@@ -230,6 +239,11 @@ export interface IStorage {
   getQuizzesDueBetween(from: number, to: number): Promise<Quiz[]>;
   getReminderKeys(quizIds: number[]): Promise<Set<string>>;
   logReminder(quizId: number, studentId: number): Promise<boolean>;
+  // parent links
+  setParentLink(studentId: number, tokenHash: string, createdBy: number): Promise<void>;
+  getParentLinkByStudent(studentId: number): Promise<{ createdAt: number } | undefined>;
+  getStudentIdByParentToken(tokenHash: string): Promise<number | undefined>;
+  deleteParentLink(studentId: number): Promise<void>;
   // feedback
   createFeedback(f: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
@@ -432,6 +446,24 @@ export class DatabaseStorage implements IStorage {
     const rows = await db.select().from(reminderLog).where(inArray(reminderLog.quizId, quizIds));
     return new Set(rows.map((r) => `${r.quizId}:${r.studentId}`));
   }
+  // ---- parent links ----
+  async setParentLink(studentId: number, tokenHash: string, createdBy: number) {
+    // One link per student: replacing it switches the old one off.
+    await db.insert(parentLinks).values({ studentId, tokenHash, createdBy, createdAt: Date.now() })
+      .onConflictDoUpdate({ target: parentLinks.studentId, set: { tokenHash, createdBy, createdAt: Date.now() } });
+  }
+  async getParentLinkByStudent(studentId: number) {
+    const rows = await db.select().from(parentLinks).where(eq(parentLinks.studentId, studentId));
+    return rows[0] ? { createdAt: rows[0].createdAt } : undefined;
+  }
+  async getStudentIdByParentToken(tokenHash: string) {
+    const rows = await db.select().from(parentLinks).where(eq(parentLinks.tokenHash, tokenHash));
+    return rows[0]?.studentId;
+  }
+  async deleteParentLink(studentId: number) {
+    await db.delete(parentLinks).where(eq(parentLinks.studentId, studentId));
+  }
+
   /** Records a reminder; false if one was already recorded (another run won). */
   async logReminder(quizId: number, studentId: number) {
     const rows = await db.insert(reminderLog).values({ quizId, studentId, sentAt: Date.now() })

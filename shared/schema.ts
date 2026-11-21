@@ -307,3 +307,14 @@ export const reminderLog = pgTable("reminder_log", {
   studentId: integer("student_id").notNull(),
   sentAt: ts("sent_at").notNull(),
 });
+
+// Read-only link a parent can open to see a student's progress. Only a
+// SHA-256 hash of the token is stored. One active link per student.
+export const parentLinks = pgTable("parent_links", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+export type ParentLink = typeof parentLinks.$inferSelect;

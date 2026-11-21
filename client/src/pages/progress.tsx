@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT } from "@/lib/i18n";
 import { ProgressReportView } from "@/components/progress-report";
+import { ParentLinkCard } from "@/components/parent-link";
 import { ArrowLeft } from "lucide-react";
 import type { ProgressReport } from "@shared/progress";
 
@@ -16,6 +17,7 @@ export function MyProgress() {
         <p className="text-sm text-muted-foreground">{t("prog.sub")}</p>
       </div>
       {isLoading || !data ? <Skeleton className="h-96 rounded-2xl" /> : <ProgressReportView report={data} />}
+      <ParentLinkCard />
     </div>
   );
 }
@@ -36,6 +38,7 @@ export function StudentProgress({ id }: { id: number }) {
         <p className="text-sm text-muted-foreground">{t("prog.teacherSub")}</p>
       </div>
       {isLoading || !data ? <Skeleton className="h-96 rounded-2xl" /> : <ProgressReportView report={data} />}
+      <ParentLinkCard studentId={id} />
     </div>
   );
 }

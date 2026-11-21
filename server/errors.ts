@@ -13,6 +13,7 @@ export const ERROR_CODES: Record<string, string> = {
   "Not authenticated": "not_authenticated",
   "Teachers only": "teachers_only",
   "Admins only": "admins_only",
+  "Students only": "students_only",
   "Invalid credentials": "invalid_credentials",
   "Login failed": "login_failed",
   "Registration failed": "registration_failed",
