@@ -5,9 +5,11 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
 import { ensureSchema } from "./storage";
+import { securityHeaders } from "./security";
 
 export const app = express();
 const httpServer = createServer(app);
+securityHeaders(app);
 
 declare module "http" {
   interface IncomingMessage {
