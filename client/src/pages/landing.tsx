@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { GraduationCap, BookOpen, Loader2, Check } from "lucide-react";
+import { GraduationCap, BookOpen, Loader2, Check, Gamepad2 } from "lucide-react";
 
 const FACTS = ["landing.fact.formulas", "landing.fact.variants", "landing.fact.deadlines", "landing.fact.languages"];
 
@@ -120,6 +120,10 @@ export default function Landing() {
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
             <a href="#how" onClick={(e) => { e.preventDefault(); document.getElementById("how")?.scrollIntoView({ behavior: "smooth" }); }} className="font-medium text-primary underline-offset-4 hover:underline">{t("lp.howLink")}</a>
+            <span aria-hidden="true" className="mx-2">·</span>
+            <Link href="/fun" className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline" data-testid="link-fun-zone">
+              <Gamepad2 className="h-4 w-4" />{t("lp.funLink")}
+            </Link>
           </p>
           <SampleSheet className="mt-8 hidden lg:block" />
           <ul className="mt-8 hidden max-w-lg gap-x-6 gap-y-2.5 text-sm lg:grid lg:grid-cols-2">
@@ -218,6 +222,7 @@ export default function Landing() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm text-muted-foreground lg:px-8">
           <Logo className="text-base" />
+          <Link href="/fun" className="font-medium text-primary underline-offset-4 hover:underline">{t("nav.fun")}</Link>
           <Link href="/feedback" className="font-medium text-primary underline-offset-4 hover:underline">{t("nav.feedback")}</Link>
         </div>
       </footer>

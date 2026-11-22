@@ -1,17 +1,20 @@
 import {
   users, groups, groupMembers, quizzes, submissions, sessions, feedback,
   materials, materialGroups, passwordResetTokens, bankQuestions, reminderLog, parentLinks,
+  gameScores, forumQuestions, forumAnswers,
 } from "@shared/schema";
 import type {
   User, InsertUser, Group, InsertGroup, GroupMember,
   Quiz, InsertQuiz, Submission, InsertSubmission,
   ClassSession, InsertSession, Feedback, InsertFeedback,
   Material, InsertMaterial, MaterialGroup, PasswordResetToken, BankQuestion,
+  ForumQuestion, ForumAnswer,
 } from "@shared/schema";
+import type { ForumQuestionInput } from "@shared/forum";
 import { hashResetToken } from "./auth-policy";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, inArray, desc, gte, lte } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lte, sql, or, ilike } from "drizzle-orm";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -195,6 +198,39 @@ CREATE TABLE IF NOT EXISTS parent_links (
 );
 ALTER TABLE parent_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_groups ENABLE ROW LEVEL SECURITY;
+-- Fun zone scores and the Q&A forum.
+CREATE TABLE IF NOT EXISTS game_scores (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  game TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS game_scores_game_time ON game_scores (game, created_at);
+ALTER TABLE game_scores ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS forum_questions (
+  id SERIAL PRIMARY KEY,
+  author_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL DEFAULT '',
+  topic TEXT NOT NULL DEFAULT '',
+  accepted_answer_id INTEGER,
+  answer_count INTEGER NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS forum_questions_time ON forum_questions (created_at);
+ALTER TABLE forum_questions ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS forum_answers (
+  id SERIAL PRIMARY KEY,
+  question_id INTEGER NOT NULL,
+  author_id INTEGER NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS forum_answers_question ON forum_answers (question_id);
+ALTER TABLE forum_answers ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_google_id_unique') THEN
     ALTER TABLE users ADD CONSTRAINT users_google_id_unique UNIQUE (google_id);
@@ -275,7 +311,23 @@ export interface IStorage {
   deleteMaterial(id: number): Promise<string[]>;
   setMaterialGroups(materialId: number, groupIds: number[]): Promise<void>;
   getMaterialGroups(materialId: number): Promise<MaterialGroup[]>;
+  // fun zone
+  addGameScore(userId: number, game: string, score: number): Promise<void>;
+  leaderboard(game: string, since: number, limit: number): Promise<{ userId: number; fullName: string; score: number }[]>;
+  bestScore(userId: number, game: string, since: number): Promise<number | null>;
+  // forum
+  listForumQuestions(f: { q?: string; topic?: string; unanswered?: boolean; mine?: number; limit: number; offset: number }): Promise<ForumListItem[]>;
+  getForumQuestion(id: number): Promise<ForumQuestion | undefined>;
+  createForumQuestion(authorId: number, q: ForumQuestionInput): Promise<ForumQuestion>;
+  deleteForumQuestion(id: number): Promise<void>;
+  getForumAnswers(questionId: number): Promise<ForumAnswer[]>;
+  getForumAnswer(id: number): Promise<ForumAnswer | undefined>;
+  createForumAnswer(questionId: number, authorId: number, body: string, image: string): Promise<ForumAnswer>;
+  deleteForumAnswer(answer: ForumAnswer): Promise<void>;
+  acceptForumAnswer(questionId: number, answerId: number | null): Promise<void>;
 }
+
+export type ForumListItem = Omit<ForumQuestion, "image" | "body"> & { excerpt: string; hasImage: boolean };
 
 export class DatabaseStorage implements IStorage {
   // ---- users ----
@@ -602,6 +654,92 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(materialGroups)
       .where(eq(materialGroups.materialId, materialId));
   }
+  // ---- fun zone ----
+  async addGameScore(userId: number, game: string, score: number) {
+    await db.insert(gameScores).values({ userId, game, score, createdAt: Date.now() });
+  }
+  async leaderboard(game: string, since: number, limit: number) {
+    const best = sql<number>`max(${gameScores.score})`.mapWith(Number);
+    const rows = await db
+      .select({ userId: gameScores.userId, fullName: users.fullName, score: best })
+      .from(gameScores)
+      .innerJoin(users, eq(users.id, gameScores.userId))
+      .where(and(eq(gameScores.game, game), gte(gameScores.createdAt, since)))
+      .groupBy(gameScores.userId, users.fullName)
+      .orderBy(desc(best))
+      .limit(limit);
+    return rows;
+  }
+  async bestScore(userId: number, game: string, since: number) {
+    const [row] = await db
+      .select({ best: sql<number | null>`max(${gameScores.score})` })
+      .from(gameScores)
+      .where(and(eq(gameScores.userId, userId), eq(gameScores.game, game), gte(gameScores.createdAt, since)));
+    return row?.best == null ? null : Number(row.best);
+  }
+
+  // ---- forum ----
+  async listForumQuestions(f: { q?: string; topic?: string; unanswered?: boolean; mine?: number; limit: number; offset: number }) {
+    const conds = [];
+    if (f.q) {
+      const like = `%${f.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+      conds.push(or(ilike(forumQuestions.title, like), ilike(forumQuestions.body, like)));
+    }
+    if (f.topic) conds.push(eq(forumQuestions.topic, f.topic));
+    if (f.unanswered) conds.push(eq(forumQuestions.answerCount, 0));
+    if (f.mine) conds.push(eq(forumQuestions.authorId, f.mine));
+    const rows = await db
+      .select({
+        id: forumQuestions.id, authorId: forumQuestions.authorId, title: forumQuestions.title,
+        topic: forumQuestions.topic, acceptedAnswerId: forumQuestions.acceptedAnswerId,
+        answerCount: forumQuestions.answerCount, createdAt: forumQuestions.createdAt,
+        excerpt: sql<string>`left(${forumQuestions.body}, 220)`,
+        hasImage: sql<boolean>`${forumQuestions.image} <> ''`,
+      })
+      .from(forumQuestions)
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(forumQuestions.createdAt))
+      .limit(f.limit)
+      .offset(f.offset);
+    return rows;
+  }
+  async getForumQuestion(id: number) {
+    const [q] = await db.select().from(forumQuestions).where(eq(forumQuestions.id, id));
+    return q;
+  }
+  async createForumQuestion(authorId: number, q: ForumQuestionInput) {
+    const [row] = await db.insert(forumQuestions).values({ ...q, authorId, createdAt: Date.now() }).returning();
+    return row;
+  }
+  async deleteForumQuestion(id: number) {
+    await db.delete(forumAnswers).where(eq(forumAnswers.questionId, id));
+    await db.delete(forumQuestions).where(eq(forumQuestions.id, id));
+  }
+  async getForumAnswers(questionId: number) {
+    return db.select().from(forumAnswers).where(eq(forumAnswers.questionId, questionId)).orderBy(forumAnswers.createdAt);
+  }
+  async getForumAnswer(id: number) {
+    const [a] = await db.select().from(forumAnswers).where(eq(forumAnswers.id, id));
+    return a;
+  }
+  async createForumAnswer(questionId: number, authorId: number, body: string, image: string) {
+    const [row] = await db.insert(forumAnswers).values({ questionId, authorId, body, image, createdAt: Date.now() }).returning();
+    await db.update(forumQuestions).set({ answerCount: sql`${forumQuestions.answerCount} + 1` }).where(eq(forumQuestions.id, questionId));
+    return row;
+  }
+  async deleteForumAnswer(answer: ForumAnswer) {
+    await db.delete(forumAnswers).where(eq(forumAnswers.id, answer.id));
+    await db.update(forumQuestions)
+      .set({
+        answerCount: sql`greatest(${forumQuestions.answerCount} - 1, 0)`,
+        acceptedAnswerId: sql`case when ${forumQuestions.acceptedAnswerId} = ${answer.id} then null else ${forumQuestions.acceptedAnswerId} end`,
+      })
+      .where(eq(forumQuestions.id, answer.questionId));
+  }
+  async acceptForumAnswer(questionId: number, answerId: number | null) {
+    await db.update(forumQuestions).set({ acceptedAnswerId: answerId }).where(eq(forumQuestions.id, questionId));
+  }
+
 }
 
 export const storage = new DatabaseStorage();

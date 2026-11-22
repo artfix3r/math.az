@@ -311,7 +311,19 @@
   .count-tick { animation: count-tick 220ms cubic-bezier(.16,1,.3,1); }
   @keyframes count-tick { from { transform: translateY(35%); opacity: 0; } to { transform: none; opacity: 1; } }
 
+  /* Fun zone: a new or merged tile lands, a wrong answer shakes, cards turn over */
+  .tile-pop { animation: tile-pop 160ms cubic-bezier(.16,1,.3,1); }
+  @keyframes tile-pop { from { transform: scale(.82); } to { transform: none; } }
+  .shake { animation: shake 280ms cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+  .card-flip { transform-style: preserve-3d; transition: transform 320ms cubic-bezier(.16,1,.3,1); }
+  .card-flip.is-up { transform: rotateY(180deg); }
+  .card-face { backface-visibility: hidden; }
+  .card-back { transform: rotateY(180deg); }
+
   @media (prefers-reduced-motion: reduce) {
+    .tile-pop, .shake { animation: none; }
+    .card-flip { transition: none; }
     .pen-stroke { animation: none; stroke-dashoffset: 0; }
     .pen-write { animation: none; clip-path: none; }
     .pen-strike { animation: none; transform: rotate(-6deg); }

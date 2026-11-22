@@ -11,7 +11,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Home, Users, FileQuestion, Library, BarChart3, Video, Trophy, LogOut, Moon, Sun,
-  Globe, MessageSquareHeart, FolderOpen, TrendingUp, MoreHorizontal, Check,
+  Globe, MessageSquareHeart, FolderOpen, TrendingUp, MoreHorizontal, Check, Gamepad2, MessagesSquare,
 } from "lucide-react";
 
 type NavItem = { href: string; key: string; icon: React.ElementType };
@@ -24,6 +24,8 @@ const TEACHER_NAV: NavItem[] = [
   { href: "/library", key: "nav.library", icon: Library },
   { href: "/materials", key: "nav.materials", icon: FolderOpen },
   { href: "/sessions", key: "nav.sessions", icon: Video },
+  { href: "/forum", key: "nav.forum", icon: MessagesSquare },
+  { href: "/fun", key: "nav.fun", icon: Gamepad2 },
   { href: "/feedback", key: "nav.feedback", icon: MessageSquareHeart },
 ];
 
@@ -34,6 +36,8 @@ const STUDENT_NAV: NavItem[] = [
   { href: "/materials", key: "nav.materials", icon: FolderOpen },
   { href: "/results", key: "nav.results", icon: Trophy },
   { href: "/sessions", key: "nav.sessions", icon: Video },
+  { href: "/forum", key: "nav.forum", icon: MessagesSquare },
+  { href: "/fun", key: "nav.fun", icon: Gamepad2 },
   { href: "/feedback", key: "nav.feedback", icon: MessageSquareHeart },
 ];
 

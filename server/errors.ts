@@ -53,6 +53,8 @@ export const ERROR_CODES: Record<string, string> = {
   "The database is not reachable right now. Please try again in a minute.": "db_unavailable",
   "Too many attempts": "too_many_attempts",
   "Not found": "not_found",
+  "Invalid score": "invalid_score",
+  "Only the person who asked can choose the best answer": "not_your_question",
 };
 
 const PATTERNS: { re: RegExp; code: string; params?: (m: RegExpMatchArray) => Record<string, string> }[] = [
@@ -64,6 +66,9 @@ const PATTERNS: { re: RegExp; code: string; params?: (m: RegExpMatchArray) => Re
 const ZOD_MESSAGES: Record<string, string> = {
   "Password must be at least 8 characters": "password_too_short",
   "Password needs a special character": "password_needs_special",
+  "Title must be at least 5 characters": "title_too_short",
+  "Write an answer or add a photo": "answer_empty",
+  "Invalid image": "invalid_image",
 };
 
 /** Every code the server can send (used to check translations exist). */

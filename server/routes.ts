@@ -13,6 +13,8 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { buildReview, canRevealAnswers } from "@shared/review";
 import { sanitizeAnswers, isDrawing } from "@shared/answers";
+import { isGame, isValidScore, weekStart } from "@shared/games";
+import { FORUM_TOPICS, forumQuestionInput, forumAnswerInput, shortName } from "@shared/forum";
 import { checkLimit, isLimited, clientIp } from "./rate-limit";
 import { sessionStillValid } from "./auth-policy";
 import { randomBytes } from "node:crypto";
@@ -1072,6 +1074,121 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const b = await storage.getBankQuestion(Number(req.params.id));
     if (!b || b.teacherId !== user.id) return notFound(res, "Question");
     await storage.deleteBankQuestion(b.id);
+    res.json({ ok: true });
+  });
+
+  // ---------------- Fun zone ----------------
+  // Anyone can read the weekly leaderboard; only signed-in players' scores are kept.
+  app.get("/api/games/leaderboard", async (req, res) => {
+    const game = req.query.game;
+    if (!isGame(game)) return res.status(404).json({ message: "Not found" });
+    const since = weekStart(Date.now());
+    const me = await authUser(req);
+    const rows = await storage.leaderboard(game, since, 10);
+    res.json({
+      weekStart: since,
+      top: rows.map((r, i) => ({ rank: i + 1, name: shortName(r.fullName), score: r.score, me: me?.id === r.userId })),
+      myBest: me ? await storage.bestScore(me.id, game, since) : null,
+    });
+  });
+
+  app.post("/api/games/scores", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const { game, score } = req.body ?? {};
+    if (!isGame(game) || !isValidScore(game, score)) return res.status(400).json({ message: "Invalid score" });
+    const r = await checkLimit(dbCounter, `score:${user.id}`, 120, 60 * MIN);
+    if (!r.allowed) return tooMany(res, r.retryAfterSec);
+    await storage.addGameScore(user.id, game, score);
+    res.json({ ok: true, best: await storage.bestScore(user.id, game, weekStart(Date.now())) });
+  });
+
+  // ---------------- Q&A forum (signed-in users) ----------------
+  async function forumAuthors(ids: number[]) {
+    const people = await storage.getUsersByIds(Array.from(new Set(ids)));
+    return new Map(people.map((u) => [u.id, { name: shortName(u.fullName), role: u.role, color: u.avatarColor }]));
+  }
+
+  app.get("/api/forum/questions", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const q = String(req.query.q ?? "").trim().slice(0, 100);
+    const topic = (FORUM_TOPICS as readonly string[]).includes(String(req.query.topic)) ? String(req.query.topic) : undefined;
+    const page = Math.min(Math.max(Number(req.query.page) || 0, 0), 500);
+    const rows = await storage.listForumQuestions({
+      q: q || undefined, topic, unanswered: req.query.filter === "unanswered",
+      mine: req.query.filter === "mine" ? user.id : undefined, limit: 21, offset: page * 20,
+    });
+    const authors = await forumAuthors(rows.map((r) => r.authorId));
+    res.json({
+      items: rows.slice(0, 20).map(({ authorId, ...r }) => ({ ...r, author: authors.get(authorId) ?? null, mine: authorId === user.id })),
+      hasMore: rows.length > 20,
+    });
+  });
+
+  app.get("/api/forum/questions/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const q = await storage.getForumQuestion(Number(req.params.id));
+    if (!q) return notFound(res, "Question");
+    const answers = await storage.getForumAnswers(q.id);
+    const authors = await forumAuthors([q.authorId, ...answers.map((a) => a.authorId)]);
+    const { authorId, ...rest } = q;
+    res.json({
+      ...rest,
+      author: authors.get(authorId) ?? null,
+      mine: authorId === user.id,
+      answers: answers.map(({ authorId: aid, ...a }) => ({ ...a, author: authors.get(aid) ?? null, mine: aid === user.id })),
+    });
+  });
+
+  app.post("/api/forum/questions", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const parsed = forumQuestionInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(zodErrorBody(parsed.error));
+    const r = await checkLimit(dbCounter, `forum-q:${user.id}`, 10, 60 * MIN);
+    if (!r.allowed) return tooMany(res, r.retryAfterSec);
+    const q = await storage.createForumQuestion(user.id, parsed.data);
+    res.json({ id: q.id });
+  });
+
+  app.delete("/api/forum/questions/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const q = await storage.getForumQuestion(Number(req.params.id));
+    if (!q || q.authorId !== user.id) return notFound(res, "Question");
+    await storage.deleteForumQuestion(q.id);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/forum/questions/:id/answers", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const q = await storage.getForumQuestion(Number(req.params.id));
+    if (!q) return notFound(res, "Question");
+    const parsed = forumAnswerInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(zodErrorBody(parsed.error));
+    const r = await checkLimit(dbCounter, `forum-a:${user.id}`, 30, 60 * MIN);
+    if (!r.allowed) return tooMany(res, r.retryAfterSec);
+    const a = await storage.createForumAnswer(q.id, user.id, parsed.data.body, parsed.data.image);
+    res.json({ id: a.id });
+  });
+
+  app.delete("/api/forum/answers/:id", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const a = await storage.getForumAnswer(Number(req.params.id));
+    if (!a || a.authorId !== user.id) return notFound(res, "Answer");
+    await storage.deleteForumAnswer(a);
+    res.json({ ok: true });
+  });
+
+  // The asker picks the best answer (or clears the choice with answerId: null).
+  app.post("/api/forum/questions/:id/accept", requireUser, async (req, res) => {
+    const user = (req as any).user as User;
+    const q = await storage.getForumQuestion(Number(req.params.id));
+    if (!q) return notFound(res, "Question");
+    if (q.authorId !== user.id) return res.status(403).json({ message: "Only the person who asked can choose the best answer" });
+    const answerId = req.body?.answerId ?? null;
+    if (answerId !== null) {
+      const a = Number.isInteger(answerId) ? await storage.getForumAnswer(answerId) : undefined;
+      if (!a || a.questionId !== q.id) return notFound(res, "Answer");
+    }
+    await storage.acceptForumAnswer(q.id, answerId);
     res.json({ ok: true });
   });
 

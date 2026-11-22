@@ -328,3 +328,41 @@ export const parentLinks = pgTable("parent_links", {
   createdAt: ts("created_at").notNull(),
 });
 export type ParentLink = typeof parentLinks.$inferSelect;
+
+// ---------------- Fun zone: game scores ----------------
+// Only signed-in players' scores are stored (guests keep a personal best in
+// the browser). The weekly leaderboard reads the best score per player since
+// the start of the week.
+export const gameScores = pgTable("game_scores", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  game: text("game").notNull(),
+  score: integer("score").notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+export type GameScore = typeof gameScores.$inferSelect;
+
+// ---------------- Q&A forum ----------------
+// image: an optional compressed photo as a data:image/... URL.
+export const forumQuestions = pgTable("forum_questions", {
+  id: serial("id").primaryKey(),
+  authorId: integer("author_id").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  image: text("image").notNull().default(""),
+  topic: text("topic").notNull().default(""),
+  acceptedAnswerId: integer("accepted_answer_id"),
+  answerCount: integer("answer_count").notNull().default(0),
+  createdAt: ts("created_at").notNull(),
+});
+export type ForumQuestion = typeof forumQuestions.$inferSelect;
+
+export const forumAnswers = pgTable("forum_answers", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").notNull(),
+  authorId: integer("author_id").notNull(),
+  body: text("body").notNull().default(""),
+  image: text("image").notNull().default(""),
+  createdAt: ts("created_at").notNull(),
+});
+export type ForumAnswer = typeof forumAnswers.$inferSelect;

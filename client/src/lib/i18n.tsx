@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
+import { PLAY_DICTS } from "./i18n-play";
 
 export type Lang = "en" | "az" | "ru";
 
@@ -2300,7 +2301,11 @@ const ru: Dict = {
   "lp.for.topicsNote": "Это примеры: фиксированного списка нет. Каждому вопросу можно указать тему и следить за ней на странице прогресса.",
 };
 
-const DICTS: Record<Lang, Dict> = { en, az, ru };
+const DICTS: Record<Lang, Dict> = {
+  en: { ...en, ...PLAY_DICTS.en },
+  az: { ...az, ...PLAY_DICTS.az },
+  ru: { ...ru, ...PLAY_DICTS.ru },
+};
 
 function fill(str: string, vars?: Record<string, string | number>) {
   if (!vars) return str;

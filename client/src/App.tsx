@@ -22,6 +22,8 @@ import Sessions from "@/pages/sessions";
 import TakeQuiz from "@/pages/take-quiz";
 import MyResults from "@/pages/my-results";
 import Feedback from "@/pages/feedback";
+import { FunHub, FunGame } from "@/pages/fun";
+import { ForumList, ForumAsk, ForumQuestion } from "@/pages/forum";
 import ResetPassword from "@/pages/reset-password";
 import { AppShell } from "@/pages/shell";
 import PrintQuiz from "@/pages/print-quiz";
@@ -83,6 +85,11 @@ function AppRouter() {
       <Route path="/results/:id">{(p) => <Protected><ResultDetail id={Number(p.id)} /></Protected>}</Route>
       <Route path="/results">{() => <Protected><MyResults /></Protected>}</Route>
       <Route path="/feedback" component={FeedbackRoute} />
+      <Route path="/fun" component={FunHub} />
+      <Route path="/fun/:game">{(p) => <FunGame key={p.game} game={p.game} />}</Route>
+      <Route path="/forum">{() => <Protected><ForumList /></Protected>}</Route>
+      <Route path="/forum/ask">{() => <Protected><ForumAsk /></Protected>}</Route>
+      <Route path="/forum/:id">{(p) => <Protected><ForumQuestion id={Number(p.id)} /></Protected>}</Route>
       <Route path="/parent/:token">{(p) => <ParentView token={p.token} />}</Route>
       <Route path="/reset-password/:token">{(p) => <ResetPassword token={p.token} />}</Route>
       <Route path="/reset-password">{() => <ResetPassword token="" />}</Route>
